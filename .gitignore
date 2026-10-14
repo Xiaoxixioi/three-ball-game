@@ -1,0 +1,10 @@
+# Local only — not part of the hosted game
+PlayGame.bat
+StartGame.ps1
+StopGame.bat
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
