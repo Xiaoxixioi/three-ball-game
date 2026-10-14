@@ -8,9 +8,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background-color: #020310;
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: cover;
       overflow: hidden;
       font-family: 'Segoe UI', sans-serif;
       position: fixed;
@@ -21,11 +18,26 @@
       touch-action: none;
       -webkit-tap-highlight-color: transparent;
     }
-    /* 加载期间不显示星云背景，等小球掉进商店后再出现 */
-    body.loading {
-      background-image: none !important;
+    /* 星云背景独立固定层：按视觉视口(visualViewport)像素铺满，
+       彻底规避移动端地址栏收起时 body 布局视口不延伸导致的底部露黑。 */
+    #bgLayer {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      z-index: -2;
       background-color: #020310;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+      background-attachment: fixed;
+      opacity: 0;
+      transition: opacity 0.6s ease;
     }
+    /* 加载期间不显示星云背景，等小球掉进商店后再淡入出现 */
+    body.loading #bgLayer { opacity: 0; }
+    body:not(.loading) #bgLayer { opacity: 1; }
     canvas { display: block; position: fixed; top: 0; left: 0; touch-action: none; }
     #info {
       position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
@@ -83,7 +95,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: radial-gradient(ellipse at center, #0a0520 0%, #020310 100%);
+      background: radial-gradient(ellipse at center, rgba(10,5,32,0.72) 0%, rgba(2,3,16,0.88) 100%);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -1116,6 +1128,8 @@
   </style>
 </head>
 <body class="loading" data-page-node-id="ADAfnRSIqlhyDtxEk3cQe2">
+  <!-- 星云背景层（独立于 canvas，避免移动端地址栏收起时底部露黑） -->
+  <div id="bgLayer"></div>
   <!-- 开始菜单 -->
   <div id="startMenu" class="hidden" data-page-node-id="UmrUmCdIt9H918BUH92GrG">
     <div id="highScoreDisplay" data-page-node-id="Rutv2hxZJo3BsXyLHN6REQ">最高分数: <span id="highScoreValue" data-page-node-id="iUaogMss0BW6wLdCVA0EFA">0</span> ⭐</div>
@@ -1286,8 +1300,8 @@
       './assets/nebula/nebula-n44.webp',       // N44 星云
       './assets/nebula/nebula-ngc3137.webp',   // NGC 3137
     ];
-    const BG_DIM_CENTER = 0.52;  // 中心暗化：较低 → 星云更清晰
-    const BG_DIM_EDGE   = 0.80;  // 四周暗化：较高 → 抑制背景干扰、突出前景
+    const BG_DIM_CENTER = 0.25;  // 中心暗化：更低 → 星云更清晰通透
+    const BG_DIM_EDGE   = 0.50;  // 四周暗化：进一步调轻，避免"放大过头"只剩中心亮
 
     let lastNebula = null;
     /** 随机挑一张星云设为游戏背景（避免与上一张重复） */
@@ -1296,11 +1310,12 @@
       if (!pool.length) pool = BG_NEBULA_IMAGES;
       const pick = pool[(Math.random() * pool.length) | 0];
       lastNebula = pick;
-      // 暗角纱幕：中心较亮保留星云质感，四周压暗保证球体/轨道线对比清晰
-      const veil = 'radial-gradient(ellipse 78% 74% at 50% 46%, '
+      // 暗角纱幕：中心较亮保留星云质感，四周轻微压暗保证球体/轨道线对比清晰
+      const veil = 'radial-gradient(ellipse 92% 90% at 50% 48%, '
         + 'rgba(2,3,16,' + BG_DIM_CENTER + ') 0%, '
         + 'rgba(2,3,16,' + BG_DIM_EDGE + ') 100%)';
-      document.body.style.backgroundImage = veil + ', url("' + pick + '")';
+      const bg = document.getElementById('bgLayer');
+      if (bg) bg.style.backgroundImage = veil + ', url("' + pick + '")';
       // 预热其余两张，切换更顺滑
       BG_NEBULA_IMAGES.forEach(function (u) {
         if (u !== pick) { const im = new Image(); im.src = u; }
@@ -3748,8 +3763,15 @@
       // ── 开场加载场景优先渲染 ──────────────────────────
       if (loadingActive) { updateLoading(dt); return; }
 
-      // ── 开始菜单失重动画 ────────────────────────────────
+      // ── 开始菜单 ─────────────────────────────────────────
       if (!gameStarted) {
+        const sm = document.getElementById('startMenu');
+        // 开始界面出现后不再渲染游戏场景（避免粒子/方块压在菜单文字上），
+        // 只清空画布为透明，让底层 #bgLayer 星云自然透出作为菜单背景。
+        if (sm && !sm.classList.contains('hidden')) {
+          renderer.clear();
+          return;
+        }
         updateFloatingObjects(dt);
         controls.update();
         renderer.render(scene, camera);
@@ -4356,9 +4378,15 @@
         loadingCamera.updateProjectionMatrix();
       }
       renderer.setSize(w, h);
+      // 背景层按视觉视口像素铺满，避免移动端地址栏收起后底部露黑/露白
+      const bg = document.getElementById('bgLayer');
+      if (bg) { bg.style.width = w + 'px'; bg.style.height = h + 'px'; }
     }
     window.addEventListener('resize', onResize);
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onResize);
+      window.visualViewport.addEventListener('scroll', onResize);
+    }
     onResize();
   </script>
 </body>
