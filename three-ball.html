@@ -1,0 +1,4224 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="s8fguiIbA1vvveWAtt2FYV">
+<head data-page-node-id="N9m7fjzvNdL5iECDYp3dP0">
+  <meta charset="UTF-8" data-page-node-id="FkZkur3HkOsLI2vztzEb1k" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" data-page-node-id="g9drIRcRRu0tPPYcvS1oYg" />
+  <title>Three.js 无限轨道 · 星光</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #020310;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+      overflow: hidden;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    canvas { display: block; }
+    #info {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,0.7); font-size: 14px; text-align: center;
+      pointer-events: none; text-shadow: 0 0 10px rgba(100,180,255,0.8);
+      letter-spacing: 2px; white-space: nowrap;
+    }
+    #info span {
+      display: block; font-size: 11px; margin-top: 6px;
+      color: rgba(255,255,255,0.4); letter-spacing: 1px;
+    }
+    #stats {
+      position: absolute; top: 60px; left: 20px;
+      color: rgba(100,200,255,0.6); font-size: 11px;
+      pointer-events: none; font-family: monospace;
+    }
+    #score {
+      position: absolute; top: 20px; right: 30px;
+      display: flex; align-items: center; gap: 8px;
+      color: #ffdd44; font-size: 24px;
+      font-weight: bold; text-shadow: 0 0 10px rgba(255,220,68,0.8);
+    }
+    #starIcon { font-size: 28px; }
+    #scoreValue { min-width: 60px; }
+    
+    /* 生命值样式 */
+    #health {
+      position: absolute; top: 60px; right: 30px;
+      font-size: 32px;
+      text-shadow: 0 0 15px rgba(255,50,50,0.8);
+      transition: transform 0.2s ease;
+    }
+    #healthHearts { letter-spacing: 4px; }
+    #health.hit {
+      animation: healthShake 0.3s ease;
+    }
+    #health.heal {
+      animation: healthHeal 0.35s ease;
+    }
+    @keyframes healthHeal {
+      0%   { transform: scale(1);    filter: drop-shadow(0 0 6px rgba(255,140,180,0.3)); }
+      40%  { transform: scale(1.35); filter: drop-shadow(0 0 18px rgba(255,140,180,0.95)); }
+      100% { transform: scale(1);    filter: drop-shadow(0 0 6px rgba(255,140,180,0.3)); }
+    }
+    @keyframes healthShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    
+    /* 开始菜单样式 */
+    #startMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at center, #0a0520 0%, #020310 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #startMenu.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #startMenu h1 {
+      font-size: 48px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(100,180,255,0.8), 0 0 60px rgba(100,180,255,0.4);
+      margin-bottom: 20px;
+      letter-spacing: 8px;
+      animation: titleGlow 2s ease-in-out infinite alternate;
+    }
+    #highScoreDisplay {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      color: #ffdd44;
+      text-shadow: 0 0 10px rgba(255,220,68,0.8);
+      letter-spacing: 2px;
+    }
+    #pauseHighScore {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      color: #ffdd44;
+      text-shadow: 0 0 10px rgba(255,220,68,0.8);
+      letter-spacing: 2px;
+    }
+    #startMenu p {
+      font-size: 16px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 60px;
+      letter-spacing: 3px;
+    }
+    @keyframes titleGlow {
+      from { text-shadow: 0 0 30px rgba(100,180,255,0.8), 0 0 60px rgba(100,180,255,0.4); }
+      to { text-shadow: 0 0 50px rgba(150,220,255,1), 0 0 100px rgba(100,180,255,0.6); }
+    }
+    .menuBtn {
+      padding: 18px 60px;
+      font-size: 20px;
+      border: 2px solid rgba(100,200,255,0.6);
+      background: rgba(20,40,80,0.6);
+      color: #aaddff;
+      cursor: pointer;
+      border-radius: 50px;
+      margin: 15px;
+      transition: all 0.3s ease;
+      letter-spacing: 4px;
+      font-family: 'Segoe UI', sans-serif;
+      text-transform: uppercase;
+    }
+    .menuBtn:hover {
+      background: rgba(100,180,255,0.3);
+      border-color: rgba(150,220,255,1);
+      color: #fff;
+      box-shadow: 0 0 30px rgba(100,200,255,0.5), inset 0 0 30px rgba(100,200,255,0.1);
+      transform: scale(1.05);
+    }
+    .menuBtn.start {
+      border-color: rgba(100,255,180,0.8);
+      background: rgba(20,80,60,0.6);
+    }
+    .menuBtn.start:hover {
+      background: rgba(100,255,180,0.3);
+      border-color: rgba(150,255,200,1);
+      color: #fff;
+      box-shadow: 0 0 30px rgba(100,255,180,0.5);
+    }
+    .menuBtn.close {
+      border-color: rgba(255,100,100,0.6);
+      background: rgba(80,20,20,0.6);
+    }
+    .menuBtn.close:hover {
+      background: rgba(255,100,100,0.3);
+      border-color: rgba(255,150,150,1);
+      color: #fff;
+      box-shadow: 0 0 30px rgba(255,100,100,0.5);
+    }
+    #instructions {
+      margin-top: 36px;
+      color: rgba(255,255,255,0.45);
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    /* 🎒 开始页已装备展示 */
+    .menuEquipBar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .menuEquipLabel {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 2px;
+    }
+    .menuEquipSlot {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px dashed rgba(140, 200, 255, 0.4);
+      background: rgba(120, 200, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.25);
+      transition: all 0.2s ease;
+    }
+    .menuEquipSlot.filled {
+      border-style: solid;
+      border-color: rgba(255, 221, 68, 0.8);
+      background: rgba(255, 221, 68, 0.12);
+      box-shadow: 0 0 14px rgba(255, 220, 68, 0.35);
+    }
+
+    /* 让开始菜单内容整体不强制垂直居中，给仓库腾出空间 */
+    #startMenu {
+      justify-content: flex-start;
+      padding-top: 70px;
+    }
+    #startMenu p { margin-bottom: 28px; }
+    
+    /* 暂停菜单样式 */
+    #pauseMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 3, 16, 0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    #pauseMenu.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    #pauseMenu h2 {
+      font-size: 36px;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(100,180,255,0.8);
+      margin-bottom: 50px;
+      letter-spacing: 6px;
+    }
+    .pauseBtn {
+      padding: 15px 50px;
+      font-size: 18px;
+      border: 2px solid rgba(100,200,255,0.6);
+      background: rgba(20,40,80,0.6);
+      color: #aaddff;
+      cursor: pointer;
+      border-radius: 50px;
+      margin: 12px;
+      transition: all 0.3s ease;
+      letter-spacing: 3px;
+      font-family: 'Segoe UI', sans-serif;
+      min-width: 220px;
+      text-align: center;
+    }
+    .pauseBtn:hover {
+      background: rgba(100,180,255,0.3);
+      border-color: rgba(150,220,255,1);
+      color: #fff;
+      box-shadow: 0 0 25px rgba(100,200,255,0.5);
+      transform: scale(1.05);
+    }
+    .pauseBtn.resume {
+      border-color: rgba(100,255,180,0.8);
+      background: rgba(20,80,60,0.6);
+    }
+    .pauseBtn.resume:hover {
+      background: rgba(100,255,180,0.3);
+      border-color: rgba(150,255,200,1);
+      box-shadow: 0 0 25px rgba(100,255,180,0.5);
+    }
+    .pauseBtn.mainMenu {
+      border-color: rgba(255,180,100,0.8);
+      background: rgba(80,60,20,0.6);
+    }
+    .pauseBtn.mainMenu:hover {
+      background: rgba(255,180,100,0.3);
+      border-color: rgba(255,200,150,1);
+      box-shadow: 0 0 25px rgba(255,180,100,0.5);
+    }
+    .pauseHint {
+      position: absolute;
+      bottom: 40px;
+      color: rgba(255,255,255,0.4);
+      font-size: 14px;
+      letter-spacing: 2px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       📦  星空仓库 → 小图标 + 全屏页面
+       ══════════════════════════════════════════════════════════ */
+
+    /* —— 右上角小图标按钮 —— */
+    #starBankIcon {
+      position: absolute;
+      top: 22px;
+      right: 22px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 221, 68, 0.55);
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255, 221, 68, 0.18) 0%, rgba(40, 30, 10, 0.85) 70%);
+      color: #fff8d8;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      font-family: inherit;
+      box-shadow:
+        0 0 16px rgba(255, 220, 68, 0.35),
+        inset 0 0 12px rgba(255, 220, 68, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      z-index: 1100;
+      padding: 0;
+    }
+    #starBankIcon:hover {
+      transform: scale(1.08);
+      box-shadow:
+        0 0 24px rgba(255, 220, 68, 0.7),
+        inset 0 0 18px rgba(255, 220, 68, 0.2);
+    }
+    #starBankIcon .bankIconEmoji {
+      font-size: 20px;
+      filter: drop-shadow(0 0 4px rgba(255, 220, 68, 0.9));
+      line-height: 1;
+    }
+    #starBankIcon .bankIconCount {
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffdd44;
+      letter-spacing: 0.5px;
+      line-height: 1;
+    }
+
+    /* —— 全屏仓库页（overlay） —— */
+    #starBankPage {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 4, 14, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+    }
+    #starBankPage.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       🛡️  左上角道具槽 dock（双槽：主槽 + 附槽 + 顺时针倒计时环）
+       ══════════════════════════════════════════════════════════ */
+    #statusOrbDock {
+      position: fixed;
+      top: 90px;
+      left: 22px;
+      width: 80px;
+      height: 96px;
+      pointer-events: none;
+      z-index: 50;
+    }
+    /* 主槽（slot 0）—— 56×56 在 dock 左上角 */
+    #statusOrb {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 56px;
+      height: 56px;
+      z-index: 2;
+      border-radius: 50%;
+      border: 1.5px solid rgba(140, 200, 255, 0.55);
+      background:
+        radial-gradient(circle at 30% 30%, rgba(120, 200, 255, 0.16) 0%, rgba(20, 30, 50, 0.4) 75%);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: 0 0 14px rgba(120, 200, 255, 0.15), inset 0 0 12px rgba(120, 200, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+    }
+    /* 附槽（slot 1）—— 40×40，与主圆外切，切点偏左下约 30° */
+    #statusOrb2 {
+      position: absolute;
+      top: 50px;            /* 圆心 (28-24, 28+42) = (4, 70)，top = 70-20 = 50 */
+      left: -16px;          /* 圆心 x=4，left = 4-20 = -16 → 探出 dock 左缘 16px */
+      width: 40px;
+      height: 40px;
+      z-index: 1;
+      border-radius: 50%;
+      border: 1.5px solid rgba(140, 200, 255, 0.55);
+      background:
+        radial-gradient(circle at 30% 30%, rgba(120, 200, 255, 0.14) 0%, rgba(20, 30, 50, 0.45) 75%);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: 0 0 12px rgba(120, 200, 255, 0.12), inset 0 0 10px rgba(120, 200, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+    }
+    /* 空槽 + 有道具：颜色不同 */
+    #statusOrb.filled,
+    #statusOrb2.filled {
+      border-color: rgba(120, 200, 255, 0.9);
+    }
+    #statusOrb.shield,
+    #statusOrb2.shield {
+      border-color: rgba(120, 200, 255, 0.9);
+      box-shadow: 0 0 22px rgba(120, 200, 255, 0.55), inset 0 0 22px rgba(120, 200, 255, 0.12);
+    }
+    #statusOrb.magnet,
+    #statusOrb2.magnet {
+      border-color: rgba(255, 119, 204, 0.9);
+      box-shadow: 0 0 22px rgba(255, 119, 204, 0.5), inset 0 0 22px rgba(255, 119, 204, 0.1);
+    }
+    #statusOrb.double,
+    #statusOrb2.double {
+      border-color: rgba(255, 221, 68, 0.9);
+      box-shadow: 0 0 22px rgba(255, 221, 68, 0.55), inset 0 0 22px rgba(255, 221, 68, 0.12);
+    }
+    #statusOrb.boost,
+    #statusOrb2.boost {
+      border-color: rgba(170, 255, 119, 0.9);
+      box-shadow: 0 0 22px rgba(170, 255, 119, 0.55), inset 0 0 22px rgba(170, 255, 119, 0.12);
+    }
+    /* SVG 倒计时圆环 */
+    .statusOrbRing {
+      position: absolute;
+      inset: -3px;
+      width: calc(100% + 6px);
+      height: calc(100% + 6px);
+      transform: rotate(-90deg);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    #statusOrb.filled .statusOrbRing,
+    #statusOrb2.filled .statusOrbRing {
+      opacity: 1;
+    }
+    .statusOrbRing circle {
+      fill: none;
+      stroke: rgba(120, 200, 255, 0.95);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 4px rgba(120, 200, 255, 0.7));
+    }
+    /* 道具 emoji */
+    .statusOrbIcon {
+      font-size: 28px;
+      line-height: 1;
+      filter: drop-shadow(0 0 5px rgba(120, 200, 255, 0.5));
+      transition: font-size 0.25s ease, opacity 0.25s ease;
+    }
+    #statusOrb2 .statusOrbIcon { font-size: 20px; }
+    #statusOrb.filled .statusOrbIcon,
+    #statusOrb2.filled .statusOrbIcon {
+      opacity: 1;
+    }
+    /* 默认空槽：emoji 隐藏，但圆环底层背景色保持明显 */
+    #statusOrb:not(.filled) .statusOrbIcon,
+    #statusOrb2:not(.filled) .statusOrbIcon {
+      opacity: 0;
+    }
+    /* 拾取动画（小圈弹一下） */
+    @keyframes statusOrbPop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.18); }
+      100% { transform: scale(1); }
+    }
+    #statusOrb.filling,
+    #statusOrb2.filling {
+      animation: statusOrbPop 0.4s ease-out;
+    }
+    #statusOrbHint {
+      position: absolute;
+      top: 102px;
+      left: 0;
+      padding: 4px 10px;
+      background: rgba(10, 20, 40, 0.75);
+      color: rgba(180, 220, 255, 0.95);
+      font-size: 11px;
+      letter-spacing: 1px;
+      border-radius: 8px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    #statusOrb.filled #statusOrbHint,
+    #statusOrb2.filled ~ #statusOrbHint {
+      opacity: 1;
+    }
+    .bankPageInner {
+      position: relative;
+      width: min(620px, calc(100% - 48px));
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      padding: 36px 32px 28px;
+      border: 1.5px solid rgba(255, 221, 68, 0.45);
+      border-radius: 20px;
+      background: linear-gradient(180deg,
+        rgba(40, 30, 10, 0.55) 0%,
+        rgba(20, 14, 4, 0.7) 100%);
+      box-shadow:
+        0 0 50px rgba(255, 221, 68, 0.18),
+        inset 0 0 24px rgba(255, 200, 60, 0.06);
+      animation: bankPagePop 0.35s ease;
+    }
+    @keyframes bankPagePop {
+      from { transform: scale(0.92); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    .bankPageClose {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+    .bankPageClose:hover {
+      color: #fff;
+      border-color: rgba(255, 221, 68, 0.6);
+      background: rgba(255, 221, 68, 0.1);
+    }
+    .bankPageTitle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #ffdd44;
+      font-size: 22px;
+      letter-spacing: 6px;
+      text-shadow: 0 0 12px rgba(255, 220, 68, 0.7);
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+    .bankPageTitle .icon {
+      font-size: 26px;
+      filter: drop-shadow(0 0 8px rgba(255, 220, 68, 0.9));
+    }
+
+    /* 仓库页：星星大数字 */
+    .bankPageHero {
+      text-align: center;
+      padding: 16px 0 22px;
+      border-top: 1px dashed rgba(255, 221, 68, 0.18);
+      border-bottom: 1px dashed rgba(255, 221, 68, 0.18);
+      margin-bottom: 20px;
+    }
+    .bankPageStars {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 10px;
+    }
+    .bankPageStars #starBankTotal {
+      font-size: 56px;
+      color: #fff8d8;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-shadow: 0 0 18px rgba(255, 220, 68, 0.9);
+      font-family: 'Segoe UI', monospace;
+      transition: transform 0.25s ease, color 0.25s ease;
+      line-height: 1;
+    }
+    .bankPageStars #starBankTotal.bump {
+      transform: scale(1.18);
+      color: #ffe27a;
+    }
+    .bankPageStars .bankPageUnit {
+      font-size: 28px;
+      color: #ffdd44;
+    }
+    .bankPageStarsLabel {
+      margin-top: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      letter-spacing: 3px;
+    }
+
+    .bankPageSection { margin-bottom: 22px; }
+    .bankSectionTitle {
+      text-align: center;
+      color: rgba(255, 221, 68, 0.75);
+      font-size: 12px;
+      letter-spacing: 4px;
+      margin-bottom: 12px;
+    }
+
+    /* —— 道具格子 —— */
+    .bankItemGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 4px;
+    }
+    @media (max-width: 520px) {
+      .bankItemGrid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .itemSlot {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+      overflow: hidden;
+    }
+    .itemSlot:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 221, 68, 0.6);
+      background: rgba(255, 221, 68, 0.08);
+      box-shadow: 0 4px 14px rgba(255, 220, 68, 0.25);
+    }
+    .itemSlot.hasItem {
+      border-color: rgba(120, 255, 200, 0.45);
+      background: rgba(80, 255, 160, 0.06);
+    }
+    .itemSlot.hasItem:hover {
+      border-color: rgba(120, 255, 200, 0.8);
+      box-shadow: 0 4px 14px rgba(80, 255, 180, 0.35);
+    }
+    .itemEmoji {
+      font-size: 28px;
+      filter: drop-shadow(0 0 6px rgba(255, 220, 68, 0.6));
+      opacity: 0.45;
+      transition: opacity 0.2s ease;
+    }
+    .itemSlot.hasItem .itemEmoji { opacity: 1; }
+    .itemCount {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffdd44;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 1px 6px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      display: none;
+    }
+    .itemSlot.hasItem .itemCount { display: inline-block; }
+    .itemSlot::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .itemSlot:hover::after { opacity: 1; }
+
+    /* ══ 道具商店格子（100⭐ 兑换 + 装备） ══ */
+    .shopSlot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 8px 10px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+    .shopSlot.owned {
+      border-color: rgba(120, 255, 200, 0.45);
+      background: rgba(80, 255, 160, 0.06);
+    }
+    .shopSlot.equipped {
+      border-color: rgba(255, 221, 68, 0.75);
+      background: rgba(255, 221, 68, 0.1);
+      box-shadow: 0 0 16px rgba(255, 220, 68, 0.28);
+    }
+    .shopEmoji {
+      font-size: 30px;
+      line-height: 1;
+      opacity: 0.45;
+      filter: grayscale(0.5);
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+    .shopSlot.owned .shopEmoji,
+    .shopSlot.equipped .shopEmoji { opacity: 1; filter: none; }
+    .shopName {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      letter-spacing: 1px;
+    }
+    .shopOwn {
+      font-size: 11px;
+      color: rgba(120, 255, 200, 0.9);
+      letter-spacing: 0.5px;
+      min-height: 14px;
+    }
+    .shopOwn.empty { color: rgba(255, 255, 255, 0.3); }
+    .shopBtns {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .shopBtn {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .shopBtn.buy {
+      border-color: rgba(255, 221, 68, 0.5);
+      background: rgba(255, 221, 68, 0.12);
+      color: #ffe27a;
+    }
+    .shopBtn.buy:hover:not(:disabled) {
+      background: rgba(255, 221, 68, 0.28);
+      border-color: rgba(255, 221, 68, 0.85);
+    }
+    .shopBtn.equip {
+      border-color: rgba(120, 200, 255, 0.5);
+      background: rgba(120, 200, 255, 0.12);
+      color: #8cd4ff;
+    }
+    .shopBtn.equip:hover:not(:disabled) {
+      background: rgba(120, 200, 255, 0.28);
+      border-color: rgba(120, 200, 255, 0.85);
+    }
+    .shopBtn.equip.on {
+      border-color: rgba(255, 221, 68, 0.8);
+      background: rgba(255, 221, 68, 0.22);
+      color: #ffe27a;
+    }
+    .shopBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ══ 赛前装备槽 ══ */
+    .equipRow {
+      display: flex;
+      gap: 18px;
+      justify-content: center;
+      margin-top: 4px;
+    }
+    .equipSlot {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      border: 2px dashed rgba(140, 200, 255, 0.4);
+      background: rgba(120, 200, 255, 0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      padding: 0;
+    }
+    .equipSlot:hover {
+      border-color: rgba(140, 200, 255, 0.8);
+      background: rgba(120, 200, 255, 0.1);
+    }
+    .equipSlot.filled {
+      border-style: solid;
+      border-color: rgba(255, 221, 68, 0.8);
+      background: rgba(255, 221, 68, 0.12);
+      box-shadow: 0 0 20px rgba(255, 220, 68, 0.32);
+    }
+    .equipSlot .equipEmoji {
+      font-size: 32px;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px rgba(255, 220, 68, 0.7));
+    }
+    .equipSlot .equipPlus {
+      font-size: 28px;
+      color: rgba(140, 200, 255, 0.5);
+      line-height: 1;
+    }
+    .equipSlot .equipLabel {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 1px;
+    }
+    .equipHint {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 1px;
+    }
+    .equipHint.warn { color: rgba(255, 180, 120, 0.9); }
+
+    /* —— 仓库页底 —— */
+    .bankPageFooter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(255, 221, 68, 0.2);
+    }
+    .bankStat {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+    .bankStat .v {
+      color: #ffdd44;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+    .bankActions {
+      display: flex;
+      gap: 8px;
+    }
+    .bankBtn {
+      padding: 6px 12px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+    .bankBtn:hover {
+      color: #fff;
+      border-color: rgba(255, 221, 68, 0.6);
+      background: rgba(255, 221, 68, 0.1);
+      box-shadow: 0 0 10px rgba(255, 221, 68, 0.4);
+    }
+    .bankBtn.reset:hover {
+      border-color: rgba(255, 120, 120, 0.7);
+      background: rgba(255, 80, 80, 0.12);
+      color: #ffd0d0;
+      box-shadow: 0 0 10px rgba(255, 100, 100, 0.4);
+    }
+
+    /* 仓库格（10×n 显示每 100 颗的储存进度） */
+    .bankGrid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 10px 4px 8px;
+      border-top: 1px dashed rgba(255, 221, 68, 0.2);
+      border-bottom: 1px dashed rgba(255, 221, 68, 0.2);
+      max-height: 86px;
+      overflow: hidden;
+      justify-content: center;
+      align-items: center;
+    }
+    .bankCell {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: rgba(255, 221, 68, 0.06);
+      border: 1px solid rgba(255, 221, 68, 0.18);
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .bankCell.filled {
+      background: linear-gradient(135deg, #ffd633 0%, #ffaa00 100%);
+      border-color: rgba(255, 220, 68, 0.9);
+      box-shadow:
+        0 0 6px rgba(255, 200, 60, 0.8),
+        inset 0 0 4px rgba(255, 255, 200, 0.5);
+      animation: cellGlow 2s ease-in-out infinite alternate;
+    }
+    @keyframes cellGlow {
+      from { box-shadow: 0 0 4px rgba(255, 200, 60, 0.7), inset 0 0 3px rgba(255, 255, 200, 0.4); }
+      to   { box-shadow: 0 0 9px rgba(255, 220, 90, 1),   inset 0 0 5px rgba(255, 255, 200, 0.7); }
+    }
+    .bankCell.newest {
+      animation: cellPop 0.45s ease-out;
+    }
+    @keyframes cellPop {
+      0%   { transform: scale(0.4); opacity: 0; }
+      60%  { transform: scale(1.35); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .bankCell.milestone {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #66ffe0 0%, #00aaff 100%);
+      border-color: rgba(120, 255, 220, 0.9);
+      box-shadow: 0 0 10px rgba(100, 220, 255, 0.95);
+    }
+    .bankCell.milestone::after {
+      content: '★';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -55%);
+      font-size: 11px;
+      color: #fff;
+      text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+    }
+    .bankCell.emptyMsg {
+      width: auto;
+      padding: 0 10px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.35);
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    /* 顶部货币显示（游戏中） */
+    #topBar {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      z-index: 5;
+    }
+    #topBar #score { position: static; }   /* 复用原有 #score */
+    #topBar #health { position: static; }  /* 复用原有 #health */
+
+    /* 浮动 +N 提示（收集入库动画） */
+    .starToast {
+      position: fixed;
+      pointer-events: none;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #ffdd44;
+      text-shadow: 0 0 12px rgba(255, 220, 68, 0.9);
+      z-index: 1500;
+      animation: starToastRise 1.1s ease-out forwards;
+    }
+    @keyframes starToastRise {
+      0%   { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+      20%  { opacity: 1; transform: translate(-50%, -10px) scale(1.1); }
+      100% { opacity: 0; transform: translate(-50%, -80px) scale(0.9); }
+    }
+
+    /* 黑洞接近警告 */
+    #dangerOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(255,0,100,0.3) 100%);
+      transition: opacity 0.1s ease;
+    }
+    
+    /* 游戏结束菜单样式 */
+    #gameOverMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 3, 16, 0.9);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1002;
+    }
+    #gameOverMenu.visible {
+      display: flex;
+    }
+    #gameOverMenu h2 {
+      font-size: 48px;
+      color: #ff4466;
+      text-shadow: 0 0 30px rgba(255,68,102,0.8), 0 0 60px rgba(255,68,102,0.4);
+      margin-bottom: 20px;
+      letter-spacing: 8px;
+      animation: gameOverPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes gameOverPulse {
+      0%, 100% { text-shadow: 0 0 30px rgba(255,68,102,0.8), 0 0 60px rgba(255,68,102,0.4); }
+      50% { text-shadow: 0 0 50px rgba(255,68,102,1), 0 0 100px rgba(255,68,102,0.6); }
+    }
+    #gameOverScore {
+      font-size: 24px;
+      color: #ffdd44;
+      text-shadow: 0 0 10px rgba(255,220,68,0.8);
+      margin-bottom: 30px;
+      letter-spacing: 2px;
+    }
+    #gameOverMessage {
+      font-size: 16px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+    .menuBtn.restart {
+      border-color: rgba(100,255,180,0.8);
+      background: rgba(20,80,60,0.6);
+    }
+    .menuBtn.restart:hover {
+      background: rgba(100,255,180,0.3);
+      border-color: rgba(150,255,200,1);
+      color: #fff;
+      box-shadow: 0 0 30px rgba(100,255,180,0.5);
+    }
+    .menuBtn.mainMenu {
+      border-color: rgba(255,180,100,0.8);
+      background: rgba(80,60,20,0.6);
+    }
+    .menuBtn.mainMenu:hover {
+      background: rgba(255,180,100,0.3);
+      border-color: rgba(255,200,150,1);
+      box-shadow: 0 0 25px rgba(255,180,100,0.5);
+    }
+    /* 游戏结束面板：让两个按钮宽度统一 */
+    #gameOverMenu #btnRestart,
+    #gameOverMenu #btnGameOverMainMenu {
+      min-width: 280px;
+      padding: 18px 24px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body data-page-node-id="ADAfnRSIqlhyDtxEk3cQe2">
+  <!-- 开始菜单 -->
+  <div id="startMenu" data-page-node-id="UmrUmCdIt9H918BUH92GrG">
+    <div id="highScoreDisplay" data-page-node-id="Rutv2hxZJo3BsXyLHN6REQ">最高分数: <span id="highScoreValue" data-page-node-id="iUaogMss0BW6wLdCVA0EFA">0</span> ⭐</div>
+    <h1 data-page-node-id="syizZ34WrIjebOLGHjswmn">星光跑酷</h1>
+    <p data-page-node-id="kaZMdvBBX1BG3HF0nCL62H">STELLAR RUNNER</p>
+    <button class="menuBtn start" id="btnStart" data-page-node-id="ZX5X2q262oe5I799HA3Npr">开始游戏</button>
+    <button class="menuBtn close" id="btnClose" data-page-node-id="y11Fs7bwXVmuaejICbMjFw">关闭游戏</button>
+
+    <!-- 🎒 开始页：已装备道具展示 -->
+    <div id="menuEquipBar" class="menuEquipBar">
+      <span class="menuEquipLabel">已装备</span>
+      <span class="menuEquipSlot" data-menu-equip="0">—</span>
+      <span class="menuEquipSlot" data-menu-equip="1">—</span>
+    </div>
+
+    <div id="instructions" data-page-node-id="lDQmTnlWg9hLBVOgFaxSaC">空格 跳跃 · A/D 切换车道 · 拖拽旋转 · 滚轮缩放</div>
+
+    <!-- 📦 仓库入口图标（右上角小按钮，点击打开仓库页） -->
+    <button id="starBankIcon" type="button" title="星空仓库" aria-label="打开星空仓库">
+      <span class="bankIconEmoji">📦</span>
+      <span class="bankIconCount" id="starBankIconCount">0</span>
+    </button>
+  </div>
+
+  <!-- 🛡️ 左上角道具槽 dock（双槽：主槽 + 附槽 + SVG 顺时针倒计时环） -->
+  <div id="statusOrbDock" aria-label="道具槽">
+    <!-- 主槽 slot 0（56×56） -->
+    <div id="statusOrb" data-slot="0" aria-label="道具槽 1">
+      <svg class="statusOrbRing" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="26"></circle>
+      </svg>
+      <span class="statusOrbIcon" id="statusOrbIcon"></span>
+    </div>
+    <!-- 附槽 slot 1（40×40，位于主槽左下角靠边，部分外露） -->
+    <div id="statusOrb2" data-slot="1" aria-label="道具槽 2">
+      <svg class="statusOrbRing" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="19"></circle>
+      </svg>
+      <span class="statusOrbIcon" id="statusOrbIcon2"></span>
+    </div>
+    <!-- 提示文字（在 dock 左下靠下） -->
+    <div id="statusOrbHint">空槽</div>
+  </div>
+
+  <!-- 📦 星空仓库页（全屏 overlay：星星数 + 道具格子 + 进度格） -->
+  <div id="starBankPage">
+    <div class="bankPageInner">
+      <button class="bankPageClose" id="btnBankPageClose" type="button" title="关闭">×</button>
+      <div class="bankPageTitle">
+        <span class="icon">📦</span>
+        <span>星空仓库</span>
+      </div>
+      <div class="bankPageHero">
+        <div class="bankPageStars">
+          <span id="starBankTotal">0</span>
+          <span class="bankPageUnit">⭐</span>
+        </div>
+        <div class="bankPageStarsLabel">累计收集的星星</div>
+      </div>
+
+      <div class="bankPageSection">
+        <div class="bankSectionTitle">— 道具商店 · 100⭐ 兑换 1 个 —</div>
+        <div class="bankItemGrid" id="bankItemGrid"></div>
+      </div>
+
+      <div class="bankPageSection">
+        <div class="bankSectionTitle">— 赛前装备 · 最多 2 个（开局自动生效）—</div>
+        <div class="equipRow" id="equipRow">
+          <button class="equipSlot" data-equip="0" type="button" title="装备槽 1">
+            <span class="equipPlus">+</span>
+          </button>
+          <button class="equipSlot" data-equip="1" type="button" title="装备槽 2">
+            <span class="equipPlus">+</span>
+          </button>
+        </div>
+        <div class="equipHint" id="equipHint">点击下方道具的「装备」按钮装入 · 开局自动生效</div>
+      </div>
+
+      <div class="bankPageSection">
+        <div class="bankSectionTitle">— 星格（每格 100 颗，满 10 格 ★）—</div>
+        <div class="bankGrid" id="starBankGrid"></div>
+      </div>
+
+      <div class="bankPageFooter">
+        <div class="bankStat">已收集总数<span class="v" id="starBankCount">0</span></div>
+        <div class="bankStat">本局入账<span class="v" id="starBankSession">+0</span></div>
+        <div class="bankActions">
+          <button class="bankBtn" id="btnBankInfo" type="button">说明</button>
+          <button class="bankBtn reset" id="btnBankReset" type="button">重置仓库</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 暂停菜单 -->
+  <div id="pauseMenu" data-page-node-id="KZcCqovFVQMpONIMOHl8fa">
+    <div id="pauseHighScore" data-page-node-id="6vyriUZtEj6YqEsIo1dYQJ">最高分数: <span id="pauseHighScoreValue" data-page-node-id="MOUu1gWDsk5cDKXpmgv5Bv">0</span> ⭐</div>
+    <h2 data-page-node-id="24CKBBnptJEfmloMAFK6PR">游戏暂停</h2>
+    <button class="pauseBtn resume" id="btnResume" data-page-node-id="S2j9jQANxosgxYGY6YHUem">继续游戏</button>
+    <button class="pauseBtn mainMenu" id="btnMainMenu" data-page-node-id="wtH20cC5CnPBAUBIgaF93S">回到开始页面</button>
+    <div class="pauseHint" data-page-node-id="lBqIIEs75C5MZyeeUAdZWO">按 ESC 继续游戏</div>
+  </div>
+  
+  <!-- 游戏结束菜单 -->
+  <div id="gameOverMenu" data-page-node-id="BNKkYqqEMRXnP3pw9TIMcX">
+    <div id="gameOverScore" data-page-node-id="kw2xPcDHXSPaqUwvFTe6ji">得分: <span id="gameOverScoreValue" data-page-node-id="wY9TFIE2e6KhAAVzpJlsK5">0</span> ⭐</div>
+    <h2 data-page-node-id="mEa6D3XIZmXDZ2IXYllAUq">游戏结束</h2>
+    <p id="gameOverMessage" data-page-node-id="GaQicjRnfhWFan9qpDHudV"></p>
+    <button class="menuBtn restart" id="btnRestart" data-page-node-id="07uSgyxMi3tBwrScfSEGlx">重新开始</button>
+    <button class="menuBtn mainMenu" id="btnGameOverMainMenu" data-page-node-id="zC0foRoirzaGRdtfktzcbH">回到开始页面</button>
+  </div>
+  
+  <div id="info" data-page-node-id="peUBi2zIsGtAa291IPSnMT">
+    无限轨道 · 星光跑酷
+    <span data-page-node-id="WBVmFJ711pKKIGlrwomdyu">空格 跳跃 · A/D 切换车道 · 拖拽旋转 · 滚轮缩放</span>
+  </div>
+  <div id="stats" data-page-node-id="GdCu7tmZaNWrj9HKkE8qcC">轨道段: 0</div>
+  <div id="score" data-page-node-id="XaGjS5j6gxTClti9WjLaGD">
+    <span id="starIcon" data-page-node-id="jBACHbQpSP9D07EIfSoKAP">⭐</span>
+    <span id="scoreValue" data-page-node-id="TChCS6tw67w3CLyvuJ7sai">0</span>
+  </div>
+  
+  <!-- 生命值显示 -->
+  <div id="health" data-page-node-id="g2xw2vq6XflOe8ThaJ26nF">
+    <span id="healthHearts" data-page-node-id="dDNpGyAyugPnh3asnFFka3">❤️❤️❤️</span>
+  </div>
+  
+  <!-- 黑洞接近警告覆盖层 -->
+  <div id="dangerOverlay" data-page-node-id="lE0TgmkrfHzcXZTqKW3Yxd"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ── 场景 / 相机 / 渲染器 ──────────────────────────────────
+    const scene = new THREE.Scene();
+    // 背景改由 CSS 星云图层承担（场景透明，见 pickRandomNebulaBackground）
+    scene.background = null;
+
+    const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setClearAlpha(0);
+    // 阴影系统保持关闭：全场没有任何 receiveShadow 的物体，阴影从未显示过，
+    // 而 PointLight 投影每帧要白渲染 6 面 1024² 深度图（约 630 万像素/帧），
+    // 低端 GPU 上直接掉帧、操作迟滞。将来若要真阴影，需同时补 receiveShadow。
+    renderer.shadowMap.enabled = false;
+    document.body.appendChild(renderer.domElement);
+
+    // ══════════════════════════════════════════════════════════
+    //  🌌  背景星云：三张 NASA Hubble 深空图，每次进入随机选一张
+    //      （开始界面不变；仅游戏场景背景生效）
+    // ══════════════════════════════════════════════════════════
+    const BG_NEBULA_IMAGES = [
+      './assets/nebula/nebula-ngc7722.webp',   // NGC 7722
+      './assets/nebula/nebula-n44.webp',       // N44 星云
+      './assets/nebula/nebula-ngc3137.webp',   // NGC 3137
+    ];
+    const BG_DIM_CENTER = 0.52;  // 中心暗化：较低 → 星云更清晰
+    const BG_DIM_EDGE   = 0.80;  // 四周暗化：较高 → 抑制背景干扰、突出前景
+
+    let lastNebula = null;
+    /** 随机挑一张星云设为游戏背景（避免与上一张重复） */
+    function applyRandomNebulaBackground() {
+      let pool = BG_NEBULA_IMAGES.filter(function (u) { return u !== lastNebula; });
+      if (!pool.length) pool = BG_NEBULA_IMAGES;
+      const pick = pool[(Math.random() * pool.length) | 0];
+      lastNebula = pick;
+      // 暗角纱幕：中心较亮保留星云质感，四周压暗保证球体/轨道线对比清晰
+      const veil = 'radial-gradient(ellipse 78% 74% at 50% 46%, '
+        + 'rgba(2,3,16,' + BG_DIM_CENTER + ') 0%, '
+        + 'rgba(2,3,16,' + BG_DIM_EDGE + ') 100%)';
+      document.body.style.backgroundImage = veil + ', url("' + pick + '")';
+      // 预热其余两张，切换更顺滑
+      BG_NEBULA_IMAGES.forEach(function (u) {
+        if (u !== pick) { const im = new Image(); im.src = u; }
+      });
+      return pick;
+    }
+    // 页面加载即选定（直接跳过菜单时也有背景）
+    applyRandomNebulaBackground();
+
+    // ══════════════════════════════════════════════════════════
+    //  🎨  视觉精简开关
+    //      游戏画面只保留「轨道 / 小球 / 背景」这三类，
+    //      下面三项是纯装饰特效，关掉后不影响任何玩法逻辑。
+    // ══════════════════════════════════════════════════════════
+    const SHOW_BALL_GLOW  = false;  // 小球外层发光壳
+    const SHOW_TRAIL      = false;  // 小球拖尾粒子
+    const SHOW_METEORS    = false;  // 划过画面的流星
+    const SHOW_BLACKHOLES = true;  // 陨石障碍物（true = 生成，false = 关闭）
+
+    // 背景星点密度系数（1 = 原样不改）
+    const STAR_DENSITY     = 0.40;  // 细密星点（层 1 / 2 / 5）
+    const STAR_DENSITY_BIG = 0.30;  // 大光晕亮星（层 3 / 4，最抢眼，压得更低）
+
+    // OrbitControls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 3;
+    controls.maxDistance = 15;
+    controls.target.set(0, 0, 0);
+
+    // ══════════════════════════════════════════════════════════
+    //  🎮  游戏状态管理
+    // ══════════════════════════════════════════════════════════
+    let gameStarted = false;
+    let gamePaused = false;
+    let gameOver = false;
+    let savedTime = 0;
+    
+    // 生命值系统
+    const MAX_HEALTH = 3;
+    let currentHealth = MAX_HEALTH;
+    
+    // 最高分数（从localStorage读取）
+    let highScore = parseInt(localStorage.getItem('stellarRunnerHighScore')) || 0;
+
+    // ══════════════════════════════════════════════════════════
+    //  💰  货币系统：星空仓库（持久化累计星数 + 道具格子）
+    // ══════════════════════════════════════════════════════════
+    const STORAGE_KEY_STAR_BANK = 'stellarRunnerStarBank';
+    const STORAGE_KEY_ITEMS     = 'stellarRunnerItems';
+    const STORAGE_KEY_EQUIPPED  = 'stellarRunnerEquipped';
+    const BANK_GRID_CAPACITY    = 100;   // 仓库格可视化上限（每个格子 = 100颗）
+    const ITEM_PRICE            = 100;   // 🛒 道具单价：100 颗星星兑 1 个
+    const EQUIP_SLOT_COUNT      = 2;     // 🎒 赛前最多装备 2 个
+
+    // 一次性迁移：清空旧版道具仓库（v4：清空已攒道具 + 装备槽，星星作为货币保留）
+    const ITEMS_RESET_FLAG = 'stellarRunnerItemsReset_v4';
+    if (!localStorage.getItem(ITEMS_RESET_FLAG)) {
+      try {
+        localStorage.removeItem(STORAGE_KEY_ITEMS);
+        localStorage.removeItem(STORAGE_KEY_EQUIPPED);
+        // 清掉历史 flag，避免旧版本号残留干扰
+        localStorage.removeItem('stellarRunnerItemsReset_v2');
+        localStorage.removeItem('stellarRunnerItemsReset_v3');
+        localStorage.setItem(ITEMS_RESET_FLAG, '1');
+      } catch (e) { /* 静默 */ }
+    }
+
+    /** 道具定义：4 种道具（emoji + 名称 + 说明） */
+    const BANK_ITEMS = [
+      { id: 'shield', emoji: '🛡️', name: '护盾',   tip: '护盾 · 抵挡一次碰撞' },
+      { id: 'magnet', emoji: '🧲', name: '磁铁',   tip: '磁铁 · 吸附附近的星星' },
+      { id: 'double', emoji: '✖️2', name: '双倍', tip: '双倍得分 · 本局星星 ×2' },
+      { id: 'boost',  emoji: '⚡', name: '加速',   tip: '加速 · 移动速度 ×1.5' },
+    ];
+
+    let totalStars = parseInt(localStorage.getItem(STORAGE_KEY_STAR_BANK)) || 0;
+    let sessionEarned = 0;            // 本局游戏入库数（实时累加）
+    /** 道具计数：{ shield:n, magnet:n, ... } */
+    let items = loadItems();
+    /** 🎒 赛前装备槽：[itemId|null, itemId|null] */
+    let equipped = loadEquipped();
+
+    /** 一次性清理已下架道具（heart / skin）在旧存档中的残留，并把结果写回 localStorage */
+    (function purgeRetiredItems() {
+      const known = BANK_ITEMS.map(d => d.id);
+      let dirty = false;
+      for (const k of Object.keys(items)) {
+        if (known.indexOf(k) === -1) { delete items[k]; dirty = true; }
+      }
+      const cleaned = equipped.map(v => {
+        if (v && known.indexOf(v) === -1) { dirty = true; return null; }
+        return v;
+      });
+      if (dirty) {
+        equipped = cleaned;
+        saveItems();
+        saveEquipped();
+      }
+    })();
+
+    /** 读取装备槽 */
+    function loadEquipped() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_EQUIPPED);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const out = [];
+            for (let i = 0; i < EQUIP_SLOT_COUNT; i++) {
+              const id = arr[i] || null;
+              // 校验 id 合法性
+              out.push(id && BANK_ITEMS.some(d => d.id === id) ? id : null);
+            }
+            return out;
+          }
+        }
+      } catch (e) { /* 静默 */ }
+      return new Array(EQUIP_SLOT_COUNT).fill(null);
+    }
+    /** 写入装备槽 */
+    function saveEquipped() {
+      try { localStorage.setItem(STORAGE_KEY_EQUIPPED, JSON.stringify(equipped)); }
+      catch (e) { /* 静默 */ }
+    }
+
+    /** 读取道具数据 */
+    function loadItems() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ITEMS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // 补全可能缺失的道具（兼容旧存档）
+          for (const def of BANK_ITEMS) {
+            if (!(def.id in parsed)) parsed[def.id] = 0;
+          }
+          return parsed;
+        }
+      } catch (e) { /* 静默 */ }
+      const init = {};
+      for (const def of BANK_ITEMS) init[def.id] = 0;
+      return init;
+    }
+    /** 写入道具数据 */
+    function saveItems() {
+      try { localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items)); }
+      catch (e) { /* 静默 */ }
+    }
+    /** 加 1 个道具 */
+    function addItem(id, n = 1) {
+      if (!(id in items)) items[id] = 0;
+      items[id] += n;
+      saveItems();
+    }
+
+    /** 读取仓库数据 */
+    function loadStarBank() {
+      const v = parseInt(localStorage.getItem(STORAGE_KEY_STAR_BANK));
+      totalStars = Number.isFinite(v) && v >= 0 ? v : 0;
+    }
+
+    /** 写入仓库数据 */
+    function saveStarBank() {
+      try {
+        localStorage.setItem(STORAGE_KEY_STAR_BANK, String(totalStars));
+      } catch (e) {
+        // localStorage 不可用时静默失败
+      }
+    }
+
+    /** 渲染道具商店（100⭐ 兑换 + 装备按钮） */
+    function renderItemGrid() {
+      const grid = document.getElementById('bankItemGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      for (const def of BANK_ITEMS) {
+        const n = items[def.id] || 0;
+        const isEquipped = equipped.includes(def.id);
+        const slot = document.createElement('div');
+        slot.className = 'shopSlot';
+        if (n > 0) slot.classList.add('owned');
+        if (isEquipped) slot.classList.add('equipped');
+        const canBuy = totalStars >= ITEM_PRICE;
+        // 已装备时允许"卸下"（不论数量）；否则需要拥有 > 0
+        const canEquip = isEquipped || n > 0;
+        const actionBtn = `<button class="shopBtn equip${isEquipped ? ' on' : ''}" type="button" data-equip-item="${def.id}" ${canEquip ? '' : 'disabled'}>${isEquipped ? '卸下' : '装备'}</button>`;
+        slot.innerHTML = `
+          <span class="shopEmoji">${def.emoji}</span>
+          <span class="shopName">${def.name}</span>
+          <span class="shopOwn${n > 0 ? '' : ' empty'}">拥有 ${n}</span>
+          <div class="shopBtns">
+            <button class="shopBtn buy" type="button" data-buy="${def.id}" ${canBuy ? '' : 'disabled'}>${ITEM_PRICE}⭐</button>
+            ${actionBtn}
+          </div>
+        `;
+        grid.appendChild(slot);
+      }
+    }
+
+    /** 渲染赛前装备槽 */
+    function renderEquipSlots() {
+      const row = document.getElementById('equipRow');
+      if (!row) return;
+      const slots = row.querySelectorAll('.equipSlot');
+      slots.forEach((el, i) => {
+        const id = equipped[i];
+        const def = id ? BANK_ITEMS.find(d => d.id === id) : null;
+        if (def) {
+          el.classList.add('filled');
+          el.innerHTML = `<span class="equipEmoji">${def.emoji}</span><span class="equipLabel">${def.name}</span>`;
+        } else {
+          el.classList.remove('filled');
+          el.innerHTML = `<span class="equipPlus">+</span>`;
+        }
+      });
+      const hint = document.getElementById('equipHint');
+      if (hint) {
+        const cnt = equipped.filter(Boolean).length;
+        if (cnt === 0) {
+          hint.textContent = '点击下方道具的「装备」按钮装入 · 开局自动生效';
+          hint.classList.remove('warn');
+        } else if (cnt < EQUIP_SLOT_COUNT) {
+          hint.textContent = `已装备 ${cnt}/${EQUIP_SLOT_COUNT} · 还可再装 ${EQUIP_SLOT_COUNT - cnt} 个`;
+          hint.classList.remove('warn');
+        } else {
+          hint.textContent = `已装备 ${cnt}/${EQUIP_SLOT_COUNT} · 装满（开局自动生效）`;
+          hint.classList.remove('warn');
+        }
+        if (typeof gameStarted !== 'undefined' && gameStarted) {
+          hint.textContent = '当前局进行中 · 装备将于下一局生效';
+          hint.classList.add('warn');
+        }
+      }
+      // 同步开始页「已装备」展示
+      renderMenuEquip();
+    }
+
+    /** 渲染开始页「已装备」条 */
+    function renderMenuEquip() {
+      const bar = document.getElementById('menuEquipBar');
+      if (!bar) return;
+      bar.querySelectorAll('.menuEquipSlot').forEach((el, i) => {
+        const id = equipped[i];
+        const def = id ? BANK_ITEMS.find(d => d.id === id) : null;
+        if (def) {
+          el.classList.add('filled');
+          el.textContent = def.emoji;
+        } else {
+          el.classList.remove('filled');
+          el.textContent = '—';
+        }
+      });
+    }
+
+    /** 🛒 兑换道具（扣 100⭐） */
+    function buyItem(id) {
+      const def = BANK_ITEMS.find(d => d.id === id);
+      if (!def) return false;
+      if (totalStars < ITEM_PRICE) {
+        shopToast('星星不够 · 需要 ' + ITEM_PRICE + '⭐');
+        return false;
+      }
+      totalStars -= ITEM_PRICE;
+      saveStarBank();
+      addItem(id, 1);
+      updateStarBankDisplay();
+      shopToast(`${def.emoji} ${def.name} 兑换成功`);
+      return true;
+    }
+
+    /** 🎒 装备 / 卸下（装备从仓库扣除，卸下退还仓库） */
+    function toggleEquip(id) {
+      const def = BANK_ITEMS.find(d => d.id === id);
+      if (!def) return false;
+      const curIdx = equipped.indexOf(id);
+      if (curIdx !== -1) {
+        // 卸下 → 退还仓库
+        equipped[curIdx] = null;
+        addItem(id, 1);
+        saveEquipped();
+        updateStarBankDisplay();
+        shopToast(`${def.emoji} ${def.name} 已卸下（退回仓库）`);
+        return true;
+      }
+      const emptyIdx = equipped.indexOf(null);
+      if (emptyIdx === -1) {
+        shopToast('装备槽已满 · 请先卸下一个');
+        return false;
+      }
+      if ((items[id] || 0) <= 0) {
+        shopToast(`${def.name} 数量不足 · 请先兑换`);
+        return false;
+      }
+      items[id] -= 1;
+      saveItems();
+      equipped[emptyIdx] = id;
+      saveEquipped();
+      updateStarBankDisplay();
+      shopToast(`${def.emoji} ${def.name} 已装备`);
+      return true;
+    }
+
+    /** 商店气泡提示 */
+    function shopToast(text) {
+      spawnStarToast(text, window.innerWidth / 2 - 70, 100);
+    }
+
+    /** 🎮 开局应用赛前装备（填入双槽，倒计时开始） */
+    function applyEquippedItems() {
+      let applied = 0;
+      for (let i = 0; i < EQUIP_SLOT_COUNT; i++) {
+        const id = equipped[i];
+        if (!id) continue;
+        if (assignToSlot(i, id)) applied++;
+      }
+      // 装备已带入本局，清空
+      equipped = new Array(EQUIP_SLOT_COUNT).fill(null);
+      saveEquipped();
+      return applied;
+    }
+
+    /** 渲染图标 + 仓库页（一次性更新所有显示） */
+    function updateStarBankDisplay() {
+      // 图标上的小数字
+      const iconCount = document.getElementById('starBankIconCount');
+      if (iconCount) iconCount.textContent = totalStars >= 1000
+        ? (totalStars / 1000).toFixed(1) + 'k'
+        : totalStars.toLocaleString();
+
+      // 仓库页里的大数字
+      const totalEl = document.getElementById('starBankTotal');
+      totalEl.textContent = totalStars.toLocaleString();
+      document.getElementById('starBankCount').textContent = totalStars.toLocaleString();
+      document.getElementById('starBankSession').textContent =
+        (sessionEarned > 0 ? '+' : '') + sessionEarned;
+
+      // 渲染道具商店 + 装备槽
+      renderItemGrid();
+      renderEquipSlots();
+
+      // 渲染进度格子（每格代表 100 颗）
+      const grid = document.getElementById('starBankGrid');
+      const filledTiers = Math.floor(totalStars / BANK_GRID_CAPACITY);
+
+      if (totalStars <= 0) {
+        grid.innerHTML = '<div class="bankCell emptyMsg">暂无收藏 · 进入游戏收集星星来充填吧</div>';
+        return;
+      }
+
+      const completeCells = Math.min(filledTiers, BANK_GRID_CAPACITY);
+      grid.innerHTML = '';
+      for (let i = 0; i < completeCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'bankCell filled';
+        if ((i + 1) % 10 === 0) cell.classList.add('milestone');
+        if (i === completeCells - 1 && sessionEarned > 0) cell.classList.add('newest');
+        grid.appendChild(cell);
+      }
+      const remainder = totalStars % BANK_GRID_CAPACITY;
+      if (remainder > 0 && completeCells < BANK_GRID_CAPACITY) {
+        const partial = document.createElement('div');
+        partial.className = 'bankCell filled newest';
+        partial.style.background =
+          `linear-gradient(90deg, #ffd633 0%, #ffaa00 ${(remainder / BANK_GRID_CAPACITY * 100).toFixed(1)}%, rgba(255,221,68,0.06) ${(remainder / BANK_GRID_CAPACITY * 100).toFixed(1)}%)`;
+        partial.style.borderColor = 'rgba(255, 220, 68, 0.6)';
+        grid.appendChild(partial);
+      }
+    }
+
+    /** 打开 / 关闭仓库页 */
+    function openStarBankPage() {
+      document.getElementById('starBankPage').classList.add('open');
+      updateStarBankDisplay();
+    }
+    function closeStarBankPage() {
+      document.getElementById('starBankPage').classList.remove('open');
+    }
+
+    /** 入库（每颗星星收集时调用） */
+    function depositStars(amount = 1) {
+      totalStars += amount;
+      sessionEarned += amount;
+      saveStarBank();
+      // 大数字"啵"动效
+      const totalEl = document.getElementById('starBankTotal');
+      if (totalEl) {
+        totalEl.classList.remove('bump');
+        void totalEl.offsetWidth;
+        totalEl.classList.add('bump');
+      }
+      // 同步图标小数字
+      const iconCount = document.getElementById('starBankIconCount');
+      if (iconCount) {
+        iconCount.textContent = totalStars >= 1000
+          ? (totalStars / 1000).toFixed(1) + 'k'
+          : totalStars.toLocaleString();
+      }
+      // 同步 sessionEarned 显示
+      const sEl = document.getElementById('starBankSession');
+      if (sEl) sEl.textContent = '+' + sessionEarned;
+    }
+
+    /** 浮动 +N 提示（屏幕任意位置冒泡） */
+    function spawnStarToast(text, fromX, fromY) {
+      const el = document.createElement('div');
+      el.className = 'starToast';
+      el.textContent = text;
+      el.style.left = fromX + 'px';
+      el.style.top  = fromY + 'px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1100);
+    }
+
+// ══════════════════════════════════════════════════════════
+//  🛡️  道具槽系统（双槽，主槽 0 + 附槽 1；每个槽带 5s 倒计时）
+// ══════════════════════════════════════════════════════════
+    const STATUS_DURATION = 8.0; // 道具激活后有效时间（秒）
+    const RING_CIRCUMFERENCE = [2 * Math.PI * 26, 2 * Math.PI * 19]; // 主槽 / 附槽的 SVG 圆周
+    const STATUS_DEFS = {
+      shield: { emoji: '🛡️', hint: '护盾 · 抵挡一次碰撞', className: 'shield', duration: STATUS_DURATION },
+      magnet: { emoji: '🧲', hint: '磁铁 · 吸附附近星星', className: 'magnet', duration: STATUS_DURATION },
+      double: { emoji: '✖️2', hint: '双倍 · 得分 ×2', className: 'double', duration: STATUS_DURATION },
+      boost:  { emoji: '⚡', hint: '加速 · 速度 ×1.5', className: 'boost',  duration: STATUS_DURATION },
+    };
+    // 每个槽的状态：null = 空；{itemId, remaining} = 占用的道具 + 剩余秒数
+    let statusSlots = [null, null];
+
+    /** 查找第一个空槽；返回 0/1；都满返回 -1 */
+    function findEmptySlot() {
+      if (statusSlots[0] === null) return 0;
+      if (statusSlots[1] === null) return 1;
+      return -1;
+    }
+
+    /** 把道具填入指定槽：更新 DOM 样式 + SVG 倒计时环 + 启动倒计时 */
+    function assignToSlot(slotIndex, itemId) {
+      const def = STATUS_DEFS[itemId];
+      if (!def) return false;
+      // 重置槽状态
+      statusSlots[slotIndex] = {
+        itemId,
+        remaining: def.duration,
+        duration: def.duration,
+      };
+      // 找 DOM
+      const orbEl = document.getElementById(slotIndex === 0 ? 'statusOrb' : 'statusOrb2');
+      const iconEl = document.getElementById(slotIndex === 0 ? 'statusOrbIcon' : 'statusOrbIcon2');
+      const ring = orbEl?.querySelector('.statusOrbRing circle');
+      if (!orbEl || !iconEl || !ring) return false;
+      // 设图标
+      iconEl.textContent = def.emoji;
+      // 移除旧的，加新的样式
+      orbEl.classList.remove('shield', 'magnet', 'double', 'boost', 'filling');
+      orbEl.classList.add('filled', def.className, 'filling');
+      // 重启动画
+      void orbEl.offsetWidth;
+      orbEl.classList.remove('filling');
+      // 初始化圆环：满圆
+      const C = RING_CIRCUMFERENCE[slotIndex];
+      ring.style.strokeDasharray = String(C);
+      ring.style.strokeDashoffset = '0';
+      // 更新顶部 hint（最近填入的道具的提示，带倒计时秒数）
+      updateStatusDockHint();
+      return true;
+    }
+
+    /** 重置指定槽的倒计时为完整 duration（用于重复拾取同一道具时刷新时间） */
+    function refreshSlotDuration(slotIndex, itemId) {
+      const def = STATUS_DEFS[itemId];
+      if (!def) return;
+      const slot = statusSlots[slotIndex];
+      if (!slot) return;
+      slot.itemId = itemId;
+      slot.remaining = def.duration;
+      slot.duration = def.duration;
+      // 重置 SVG 圆环为满圆
+      const orbEl = document.getElementById(slotIndex === 0 ? 'statusOrb' : 'statusOrb2');
+      const ring = orbEl?.querySelector('.statusOrbRing circle');
+      if (ring) {
+        const C = RING_CIRCUMFERENCE[slotIndex];
+        ring.style.strokeDasharray = String(C);
+        ring.style.strokeDashoffset = '0';
+      }
+      // 重新触发 filling 动画（视觉提示"时间已重置"）
+      if (orbEl) {
+        orbEl.classList.add('filling');
+        void orbEl.offsetWidth;
+        orbEl.classList.remove('filling');
+      }
+      updateStatusDockHint();
+    }
+
+    /** 清除指定槽 */
+    function clearStatusSlot(slotIndex) {
+      statusSlots[slotIndex] = null;
+      const orbEl = document.getElementById(slotIndex === 0 ? 'statusOrb' : 'statusOrb2');
+      const iconEl = document.getElementById(slotIndex === 0 ? 'statusOrbIcon' : 'statusOrbIcon2');
+      if (!orbEl) return;
+      orbEl.classList.remove('filled', 'shield', 'magnet', 'double', 'boost', 'filling');
+      if (iconEl) iconEl.textContent = '';
+      updateStatusDockHint();
+    }
+
+    /** 清空所有槽 */
+    function clearAllStatusSlots() {
+      for (let i = 0; i < statusSlots.length; i++) {
+        if (statusSlots[i] !== null) clearStatusSlot(i);
+      }
+      updateStatusDockHint();
+    }
+
+    /** 检查是否有任何槽持有指定 itemId */
+    function hasActiveStatus(itemId) {
+      return statusSlots.some(s => s && s.itemId === itemId);
+    }
+
+    /** 找到第一个持有 itemId 的槽（用于消耗） */
+    function findSlotWithItem(itemId) {
+      for (let i = 0; i < statusSlots.length; i++) {
+        if (statusSlots[i] && statusSlots[i].itemId === itemId) return i;
+      }
+      return -1;
+    }
+
+    /** 每帧调用：推进所有槽倒计时；到 0 自动清空 */
+    function tickStatusSlots(dt) {
+      let changed = false;
+      for (let i = 0; i < statusSlots.length; i++) {
+        const slot = statusSlots[i];
+        if (!slot) continue;
+        slot.remaining = Math.max(0, slot.remaining - dt);
+        // 更新 SVG 圆环 stroke-dashoffset：剩余比例 → 缺失部分
+        const orbEl = document.getElementById(i === 0 ? 'statusOrb' : 'statusOrb2');
+        const ring = orbEl?.querySelector('.statusOrbRing circle');
+        if (ring) {
+          const C = RING_CIRCUMFERENCE[i];
+          const ratio = slot.remaining / slot.duration; // 1 → 0
+          ring.style.strokeDashoffset = String(C * (1 - ratio));
+        }
+        if (slot.remaining <= 0) {
+          // 自动清空（自然过期）—— 无文字提醒，靠球上护盾光环消失给视觉反馈
+          clearStatusSlot(i);
+          changed = true;
+        }
+      }
+      if (changed || statusSlots.some(s => s !== null)) {
+        updateStatusDockHint();
+      }
+    }
+
+    /** 更新 dock 底部提示文字 */
+    function updateStatusDockHint() {
+      const hintEl = document.getElementById('statusOrbHint');
+      if (!hintEl) return;
+      const filled = statusSlots.filter(s => s !== null);
+      if (filled.length === 0) {
+        hintEl.textContent = '空槽';
+      } else if (filled.length === 1) {
+        const def = STATUS_DEFS[filled[0].itemId];
+        hintEl.textContent = `${def.emoji} ${def.hint} · ${filled[0].remaining.toFixed(1)}s`;
+      } else {
+        const a = STATUS_DEFS[filled[0].itemId];
+        const b = STATUS_DEFS[filled[1].itemId];
+        hintEl.textContent = `槽满 · ${a.emoji}${filled[0].remaining.toFixed(1)}s / ${b.emoji}${filled[1].remaining.toFixed(1)}s`;
+      }
+    }
+
+    /** 道具自然过期时的浮动提示 */
+    /** 护盾消耗：找到持有 shield 的槽并清除 —— 纯视觉反馈，无文字提示 */
+    function consumeShield() {
+      const idx = findSlotWithItem('shield');
+      if (idx === -1) return;
+      clearStatusSlot(idx);
+      // 球上护盾光环会在下一帧自动隐藏（updateShieldVisuals 检测 hasActiveStatus）
+    }
+
+
+    // 更新生命值显示
+    function updateHealthDisplay() {
+      const heartsContainer = document.getElementById('healthHearts');
+      let heartsHTML = '';
+      for (let i = 0; i < MAX_HEALTH; i++) {
+        if (i < currentHealth) {
+          heartsHTML += '❤️';
+        } else {
+          heartsHTML += '🖤';
+        }
+      }
+      heartsContainer.innerHTML = heartsHTML;
+    }
+
+    /** 🎬 道具拾取动画：放大 + 淡出，到 0.05 opacity 后销毁 sprite */
+    function playCollectAnim(it, scaleRate = 1.18, fadeRate = 0.88) {
+      const anim = () => {
+        it.sprite.scale.multiplyScalar(scaleRate);
+        it.sprite.material.opacity = Math.max(0, it.sprite.material.opacity * fadeRate);
+        if (it.sprite.material.opacity > 0.05) {
+          requestAnimationFrame(anim);
+        } else {
+          destroyItem(it);
+        }
+      };
+      anim();
+    }
+
+    // ── 失重漂浮粒子系统（开始菜单背景）───────────────────────
+    const floatingOrbs = [];
+    const floatingOrbsCount = 15;
+    
+    function createFloatingOrbs() {
+      for (let i = 0; i < floatingOrbsCount; i++) {
+        // 创建漂浮球体
+        const size = 0.3 + Math.random() * 0.6;
+        const geo = new THREE.SphereGeometry(size, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color().setHSL(Math.random() * 0.2 + 0.5, 0.6, 0.6),
+          transparent: true,
+          opacity: 0.6,
+        });
+        const orb = new THREE.Mesh(geo, mat);
+        
+        // 随机位置
+        orb.position.set(
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 15,
+          (Math.random() - 0.5) * 15
+        );
+        
+        // 随机速度和方向
+        orb.userData = {
+          velocity: new THREE.Vector3(
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02
+          ),
+          rotationSpeed: new THREE.Vector3(
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02
+          ),
+          bounds: { x: 15, y: 10, z: 12 }
+        };
+        
+        scene.add(orb);
+        floatingOrbs.push(orb);
+      }
+      
+      // 失重小星星
+      const floatingStarsCount = 200;
+      const starPositions = new Float32Array(floatingStarsCount * 3);
+      const starColors = new Float32Array(floatingStarsCount * 3);
+      const starSizes = new Float32Array(floatingStarsCount);
+      
+      for (let i = 0; i < floatingStarsCount; i++) {
+        starPositions[i * 3] = (Math.random() - 0.5) * 30;
+        starPositions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+        starPositions[i * 3 + 2] = (Math.random() - 0.5) * 25;
+        
+        const brightness = 0.5 + Math.random() * 0.5;
+        starColors[i * 3] = brightness;
+        starColors[i * 3 + 1] = brightness * (0.8 + Math.random() * 0.2);
+        starColors[i * 3 + 2] = brightness * (0.9 + Math.random() * 0.1);
+        
+        starSizes[i] = 0.1 + Math.random() * 0.2;
+      }
+      
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+      
+      const starMat = new THREE.PointsMaterial({
+        size: 0.3,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+      });
+      
+      const floatingStars = new THREE.Points(starGeo, starMat);
+      floatingStars.userData = {
+        velocities: [],
+        bounds: { x: 18, y: 12, z: 15 }
+      };
+      
+      // 为每颗星星生成随机速度
+      for (let i = 0; i < floatingStarsCount; i++) {
+        floatingStars.userData.velocities.push(new THREE.Vector3(
+          (Math.random() - 0.5) * 0.03,
+          (Math.random() - 0.5) * 0.03,
+          (Math.random() - 0.5) * 0.03
+        ));
+      }
+      
+      scene.add(floatingStars);
+      floatingOrbs.push(floatingStars);
+      
+      // 光晕球体
+      for (let i = 0; i < 5; i++) {
+        const glowGeo = new THREE.SphereGeometry(0.8 + Math.random() * 0.5, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color().setHSL(0.6 + Math.random() * 0.2, 0.8, 0.7),
+          transparent: true,
+          opacity: 0.15,
+          side: THREE.BackSide,
+        });
+        const glowOrb = new THREE.Mesh(glowGeo, glowMat);
+        glowOrb.position.set(
+          (Math.random() - 0.5) * 18,
+          (Math.random() - 0.5) * 12,
+          (Math.random() - 0.5) * 15
+        );
+        glowOrb.userData = {
+          velocity: new THREE.Vector3(
+            (Math.random() - 0.5) * 0.015,
+            (Math.random() - 0.5) * 0.015,
+            (Math.random() - 0.5) * 0.015
+          ),
+          bounds: { x: 12, y: 8, z: 10 }
+        };
+        scene.add(glowOrb);
+        floatingOrbs.push(glowOrb);
+      }
+    }
+    
+    function updateFloatingObjects(dt) {
+      floatingOrbs.forEach(obj => {
+        if (obj.userData.velocities) {
+          // 星星的更新
+          const positions = obj.geometry.attributes.position.array;
+          const velocities = obj.userData.velocities;
+          const bounds = obj.userData.bounds;
+          
+          for (let i = 0; i < velocities.length; i++) {
+            positions[i * 3] += velocities[i].x;
+            positions[i * 3 + 1] += velocities[i].y;
+            positions[i * 3 + 2] += velocities[i].z;
+            
+            // 边界反弹
+            if (Math.abs(positions[i * 3]) > bounds.x) velocities[i].x *= -1;
+            if (Math.abs(positions[i * 3 + 1]) > bounds.y) velocities[i].y *= -1;
+            if (Math.abs(positions[i * 3 + 2]) > bounds.z) velocities[i].z *= -1;
+          }
+          obj.geometry.attributes.position.needsUpdate = true;
+        } else {
+          // 球体和光晕的更新
+          const v = obj.userData.velocity;
+          const b = obj.userData.bounds;
+          
+          obj.position.add(v);
+          obj.rotation.x += obj.userData.rotationSpeed?.x || 0.01;
+          obj.rotation.y += obj.userData.rotationSpeed?.y || 0.01;
+          obj.rotation.z += obj.userData.rotationSpeed?.z || 0.01;
+          
+          // 边界反弹
+          if (Math.abs(obj.position.x) > b.x) v.x *= -1;
+          if (Math.abs(obj.position.y) > b.y) v.y *= -1;
+          if (Math.abs(obj.position.z) > b.z) v.z *= -1;
+        }
+      });
+    }
+    
+    function clearFloatingObjects() {
+      floatingOrbs.forEach(obj => {
+        scene.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+      floatingOrbs.length = 0;
+    }
+
+    // ── 工具函数 ───────────────────────────────────────────────
+    function randSphere(rMin, rMax) {
+      const r = rMin + Math.random() * (rMax - rMin);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      return [
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi),
+      ];
+    }
+
+    // ── 星光系统 ───────────────────────────────────────────────
+    // 层 1：远景密集小星（保持不变）
+    const N1 = Math.round(3500 * STAR_DENSITY);
+    const pos1 = new Float32Array(N1 * 3);
+    for (let i = 0; i < N1; i++) {
+      const p = randSphere(40, 120);
+      pos1[i*3] = p[0]; pos1[i*3+1] = p[1]; pos1[i*3+2] = p[2];
+    }
+    const geo1 = new THREE.BufferGeometry();
+    geo1.setAttribute('position', new THREE.BufferAttribute(pos1, 3));
+    const mat1 = new THREE.PointsMaterial({
+      color: 0xffffff, size: 0.25, sizeAttenuation: true,
+      transparent: true, opacity: 0.9,
+      map: makeStarGlowTexture(), depthWrite: false,   // 柔边光点；透明物体不写深度
+    });
+    // 四层星光 - 用 Group 包住，跟随球体移动
+    const starsGroup = new THREE.Group();
+
+    const stars1 = new THREE.Points(geo1, mat1);
+    starsGroup.add(stars1);
+
+    // 层 2：彩色中距亮星（美化：渐变色彩+大小变化+闪烁）
+    const N2 = Math.round(350 * STAR_DENSITY);
+    const pos2 = new Float32Array(N2 * 3);
+    const col2 = new Float32Array(N2 * 3);
+    const size2 = new Float32Array(N2);
+    const twinkle2 = new Float32Array(N2);
+    // 渐变调色盘：冷色到暖色
+    const palette2 = [
+      [0.4, 0.6, 1.0],   // 冰蓝
+      [0.5, 0.7, 1.0],   // 淡蓝
+      [0.7, 0.85, 1.0],  // 浅蓝白
+      [1.0, 0.9, 0.7],   // 暖白
+      [1.0, 0.75, 0.5],  // 琥珀
+      [1.0, 0.6, 0.4],  // 橙
+      [1.0, 0.5, 0.7],  // 粉紫
+      [0.7, 0.5, 1.0],  // 紫
+    ];
+    for (let i = 0; i < N2; i++) {
+      const p = randSphere(15, 40);
+      pos2[i*3] = p[0]; pos2[i*3+1] = p[1]; pos2[i*3+2] = p[2];
+      const c = palette2[Math.floor(Math.random() * palette2.length)];
+      col2[i*3] = c[0]; col2[i*3+1] = c[1]; col2[i*3+2] = c[2];
+      size2[i] = 0.3 + Math.random() * 0.4; // 大小变化
+      twinkle2[i] = Math.random() * Math.PI * 2; // 闪烁相位
+    }
+    const geo2 = new THREE.BufferGeometry();
+    geo2.setAttribute('position', new THREE.BufferAttribute(pos2, 3));
+    geo2.setAttribute('color', new THREE.BufferAttribute(col2, 3));
+    geo2.setAttribute('size', new THREE.BufferAttribute(size2, 1));
+    const mat2 = new THREE.PointsMaterial({
+      size: 0.5, sizeAttenuation: true, transparent: true, opacity: 0.95,
+      vertexColors: true, blending: THREE.AdditiveBlending,
+      map: makeStarGlowTexture(), depthWrite: false,
+    });
+    const stars2 = new THREE.Points(geo2, mat2);
+    starsGroup.add(stars2);
+
+    // 层 3：超亮光晕星（美化：多层光晕+十字光芒+脉动）
+    const N3 = Math.round(56 * STAR_DENSITY_BIG);
+    const pos3 = new Float32Array(N3 * 3);
+    const col3 = new Float32Array(N3 * 3);
+    const size3 = new Float32Array(N3);
+    const pulse3 = new Float32Array(N3);
+    // 多彩星群
+    const palette3 = [
+      [0.8, 0.9, 1.0],  // 冷白
+      [1.0, 1.0, 0.9],  // 暖白
+      [1.0, 0.95, 0.8], // 金白
+      [0.9, 0.8, 1.0],  // 紫白
+      [0.7, 0.95, 1.0], // 青白
+    ];
+    for (let i = 0; i < N3; i++) {
+      const p = randSphere(16, 30);   // 推远：大星不飘到相机身边（sizeAttenuation 下会糊屏）
+      pos3[i*3] = p[0]; pos3[i*3+1] = p[1]; pos3[i*3+2] = p[2];
+      const c = palette3[Math.floor(Math.random() * palette3.length)];
+      col3[i*3] = c[0]; col3[i*3+1] = c[1]; col3[i*3+2] = c[2];
+      size3[i] = 1.2 + Math.random() * 0.8; // 大小变化
+      pulse3[i] = Math.random() * Math.PI * 2; // 脉动相位
+    }
+    const geo3 = new THREE.BufferGeometry();
+    geo3.setAttribute('position', new THREE.BufferAttribute(pos3, 3));
+    geo3.setAttribute('color', new THREE.BufferAttribute(col3, 3));
+    geo3.setAttribute('size', new THREE.BufferAttribute(size3, 1));
+    const mat3 = new THREE.PointsMaterial({
+      size: 1.1, sizeAttenuation: true, transparent: true, opacity: 0.75,
+      vertexColors: true, blending: THREE.AdditiveBlending,
+      map: makeStarGlowTexture(), depthWrite: false,
+    });
+    const stars3 = new THREE.Points(geo3, mat3);
+    starsGroup.add(stars3);
+
+    // 层 4：星光光晕层（新增：柔和模糊光晕）
+    const N4 = Math.round(30 * STAR_DENSITY_BIG);
+    const pos4 = new Float32Array(N4 * 3);
+    const col4 = new Float32Array(N4 * 3);
+    const palette4 = [
+      [1.0, 0.9, 0.7],  // 暖黄
+      [1.0, 0.8, 0.6],  // 金橙
+      [0.9, 0.7, 1.0],  // 淡紫
+    ];
+    for (let i = 0; i < N4; i++) {
+      const p = randSphere(24, 42);   // 推远：柔光晕星尺寸最大，近距离=巨型虚影
+      pos4[i*3] = p[0]; pos4[i*3+1] = p[1]; pos4[i*3+2] = p[2];
+      const c = palette4[Math.floor(Math.random() * palette4.length)];
+      col4[i*3] = c[0]; col4[i*3+1] = c[1]; col4[i*3+2] = c[2];
+    }
+    const geo4 = new THREE.BufferGeometry();
+    geo4.setAttribute('position', new THREE.BufferAttribute(pos4, 3));
+    geo4.setAttribute('color', new THREE.BufferAttribute(col4, 3));
+    const mat4 = new THREE.PointsMaterial({
+      size: 1.8, sizeAttenuation: true, transparent: true, opacity: 0.4,
+      vertexColors: true, blending: THREE.AdditiveBlending,
+      map: makeStarGlowTexture(), depthWrite: false,
+    });
+    const stars4 = new THREE.Points(geo4, mat4);
+    starsGroup.add(stars4);
+
+    // 层 5：微小闪烁星群（新增：随机闪烁）
+    const N5 = Math.round(100 * STAR_DENSITY);
+    const pos5 = new Float32Array(N5 * 3);
+    const col5 = new Float32Array(N5 * 3);
+    const size5 = new Float32Array(N5);
+    for (let i = 0; i < N5; i++) {
+      const p = randSphere(20, 50);
+      pos5[i*3] = p[0]; pos5[i*3+1] = p[1]; pos5[i*3+2] = p[2];
+      const brightness = 0.5 + Math.random() * 0.5;
+      col5[i*3] = brightness; col5[i*3+1] = brightness; col5[i*3+2] = brightness;
+      size5[i] = 0.15 + Math.random() * 0.15;
+    }
+    const geo5 = new THREE.BufferGeometry();
+    geo5.setAttribute('position', new THREE.BufferAttribute(pos5, 3));
+    geo5.setAttribute('color', new THREE.BufferAttribute(col5, 3));
+    const mat5 = new THREE.PointsMaterial({
+      size: 0.3, sizeAttenuation: true, transparent: true, opacity: 0.7,
+      vertexColors: true,
+      map: makeStarGlowTexture(), depthWrite: false,
+    });
+    const stars5 = new THREE.Points(geo5, mat5);
+    starsGroup.add(stars5);
+
+    scene.add(starsGroup);
+    
+    // 设置星星渲染顺序，确保游戏对象始终在星星上方
+    starsGroup.renderOrder = -1;
+    [stars1, stars2, stars3, stars4, stars5].forEach(s => {
+      s.renderOrder = -1;
+    });
+
+    // 星光闪烁和脉动数据存储
+    const starTwinkleData = { twinkle2, pulse3, size2, size3, stars2, stars3, mat2, mat3 };
+
+    // ── 流星系统 ───────────────────────────────────────────────
+    const meteors = [];
+    for (let i = 0; SHOW_METEORS && i < 8; i++) {
+      const geo = new THREE.BufferGeometry();
+      const pts = new Float32Array(6);
+      geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+      const mat = new THREE.LineBasicMaterial({ color: 0xaaddff, transparent: true, opacity: 0 });
+      const line = new THREE.Line(geo, mat);
+      scene.add(line);
+      meteors.push({
+        line, geo, mat, active: false, t: 0,
+        nextTrigger: i * 1.5 + Math.random() * 2,
+        dir: new THREE.Vector3(), start: new THREE.Vector3(), speed: 0,
+      });
+    }
+
+    function resetMeteor(m) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * 0.5;
+      const R = 50;
+      m.start.set(
+        R * Math.sin(phi) * Math.cos(theta),
+        20 + Math.random() * 15,
+        R * Math.cos(phi)
+      );
+      m.dir.set((Math.random()-0.5)*0.5, -0.9-Math.random()*0.2, (Math.random()-0.5)*0.5).normalize();
+      m.speed = 20 + Math.random() * 20;
+      m.t = 0;
+      m.active = true;
+      m.mat.opacity = 0;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  🛤️  无限轨道系统（动态加载 + 回收）
+    // ══════════════════════════════════════════════════════════
+
+    const TRACK_Z = -0.8;   // 轨道平面高度
+    const LANE_X = [-3.0, -1.0, 1.0, 3.0];   // 四条车道
+    const LANE_ALPHA = [0.85, 0.30, 0.30, 0.85];
+    const LANE_SIZE = [0.070, 0.038, 0.038, 0.070];
+    const PN = 150;   // 每条车道粒子数
+
+    // 核心参数
+    const SEGMENT_LENGTH = 8.0;    // 每段轨道长度
+    const LOAD_AHEAD = 100.0;     // 前方预加载距离（更远）
+    const UNLOAD_BEHIND = 20.0;   // 后方卸载距离
+    const TRACK_SPEED = 25.0 * 0.65;     // 球体前进速度（原来的0.65倍）
+
+    // 轨道段存储（按Z位置排序）
+    const trackSegments = new Map();  // key: segmentId, value: { mesh, geometry, startZ, endZ }
+    let nextSegmentId = 0;
+
+    // ── 球体左右移动（轨道居中）──────────────────────────────
+    // 轨道边界位置：X = -3, -1, 1, 3
+    // 轨道中心：X = -2, 0, 2 （三条轨道）
+    const LANE_POSITIONS = [-3.0, -1.0, 1.0, 3.0];
+    const TRACK_CENTERS = [-2.0, 0.0, 2.0]; // 三条轨道中心
+    let currentTrackIndex = 1; // 初始在中间轨道（X=0）
+    const LANE_SWITCH_SPEED = 8.0; // 左右移动速度
+    let targetBallX = TRACK_CENTERS[currentTrackIndex];
+
+    // ── 跳跃系统 ─────────────────────────────────────────────
+    const BALL_RADIUS = 0.8;
+    const JUMP_HEIGHT = BALL_RADIUS * 2; // 跳跃高度 = 球体直径 = 1.6
+    const GRAVITY = 25.0; // 重力加速度
+    let verticalVelocity = 0; // 垂直速度
+    let isGrounded = true; // 是否在地面上
+    let jumpCooldown = 0; // 跳跃冷却
+
+    // 键盘输入
+    const keys = { a: false, d: false, space: false };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'a' || e.key === 'A') {
+        if (currentTrackIndex > 0) {
+          currentTrackIndex--;
+          targetBallX = TRACK_CENTERS[currentTrackIndex];
+        }
+      }
+      if (e.key === 'd' || e.key === 'D') {
+        if (currentTrackIndex < TRACK_CENTERS.length - 1) {
+          currentTrackIndex++;
+          targetBallX = TRACK_CENTERS[currentTrackIndex];
+        }
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (isGrounded && jumpCooldown <= 0) {
+          verticalVelocity = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+          isGrounded = false;
+          jumpCooldown = 0.3; // 300ms 冷却
+        }
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════
+    //  📱 触控基础框架（TouchFramework）
+    //  抽象输入动作，游戏通过 setActions 注入；支持「分区点击」+「滑动手势」，
+    //  并自动在触摸设备显示半透明虚拟按钮，随游戏状态显隐。桌面端自动忽略。
+    //  设计原则：动作逻辑单一来源在注入函数里，框架只负责识别手势并派发。
+    // ══════════════════════════════════════════════════════════
+    const TouchFramework = (() => {
+      const cfg = {
+        swipeMin: 36,   // 滑动触发阈值(px)
+        tapMax: 18,     // 视为点击的最大位移(px)
+        actions: {},    // { left, right, jump, pause }
+        enabled: () => true,
+        ui: true,       // 是否显示虚拟按钮
+      };
+      const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+      let ui = null, _lastShown = null;
+
+      function setActions(a) { Object.assign(cfg.actions, a); }
+      function setEnabled(fn) { cfg.enabled = fn; }
+
+      let sx = 0, sy = 0, moved = false;
+      function handleStart(t) { sx = t.clientX; sy = t.clientY; moved = false; }
+      function handleMove(t) {
+        if (Math.hypot(t.clientX - sx, t.clientY - sy) > cfg.tapMax) moved = true;
+      }
+      function handleEnd(t) {
+        if (!cfg.enabled()) return;
+        const A = cfg.actions;
+        const dx = t.clientX - sx, dy = t.clientY - sy;
+        const adx = Math.abs(dx), ady = Math.abs(dy);
+        if (!moved && adx < cfg.tapMax && ady < cfg.tapMax) {
+          (t.clientX < innerWidth / 2 ? A.left : A.right)?.();   // 分区点击
+        } else if (ady > cfg.swipeMin && ady > adx) {
+          if (dy < 0) A.jump?.();                                // 上滑 → 跳
+        } else if (adx > cfg.swipeMin && adx > ady) {
+          (dx < 0 ? A.left : A.right)?.();                        // 左右滑 → 换道
+        }
+      }
+
+      function attach(el) {
+        el.style.touchAction = 'none';
+        el.addEventListener('touchstart', (e) => { if (!cfg.enabled()) return; handleStart(e.changedTouches[0]); }, { passive: true });
+        el.addEventListener('touchmove',  (e) => { if (!cfg.enabled()) return; handleMove(e.changedTouches[0]); }, { passive: true });
+        el.addEventListener('touchend',   (e) => { if (!cfg.enabled()) return; handleEnd(e.changedTouches[0]); }, { passive: true });
+      }
+
+      function buildUI() {
+        if (!cfg.ui) return;
+        const css = `
+          #tf-touch-ui{position:fixed;inset:0;z-index:50;pointer-events:none;display:none;
+            font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none;}
+          #tf-touch-ui.show{display:block;}
+          .tf-btn{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;
+            width:74px;height:74px;border-radius:50%;font-size:34px;color:#eaf2ff;line-height:1;
+            background:rgba(120,150,200,0.18);border:2px solid rgba(180,210,255,0.45);
+            -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);touch-action:none;
+            transition:background .08s,transform .08s;}
+          .tf-btn:active{background:rgba(150,190,255,0.42);transform:scale(0.92);}
+          .tf-jump{width:96px;height:96px;font-size:42px;background:rgba(255,170,70,0.20);
+            border-color:rgba(255,200,120,0.55);}
+          .tf-left{bottom:6%;left:5%;}
+          .tf-right{bottom:6%;left:20%;}
+          .tf-jump-pos{bottom:6%;right:5%;}
+        `;
+        const style = document.createElement('style');
+        style.textContent = css;
+        document.head.appendChild(style);
+
+        ui = document.createElement('div');
+        ui.id = 'tf-touch-ui';
+        const defs = [
+          { cls: 'tf-btn tf-left',          label: '◀', act: 'left' },
+          { cls: 'tf-btn tf-right',         label: '▶', act: 'right' },
+          { cls: 'tf-btn tf-jump tf-jump-pos', label: '⤒', act: 'jump' },
+        ];
+        defs.forEach(d => {
+          const b = document.createElement('div');
+          b.className = d.cls;
+          b.textContent = d.label;
+          const fire = (e) => { e.preventDefault(); e.stopPropagation(); if (!cfg.enabled()) return; cfg.actions[d.act]?.(); };
+          b.addEventListener('touchstart', fire, { passive: false });
+          b.addEventListener('mousedown', fire); // 桌面调试可点
+          ui.appendChild(b);
+        });
+        document.body.appendChild(ui);
+      }
+
+      function init(el) {
+        attach(el);
+        buildUI();
+        // 随游戏状态自动显隐 UI（仅触摸设备）
+        const tick = () => {
+          const want = isTouchDevice && cfg.enabled();
+          if (want !== _lastShown) { _lastShown = want; if (ui) ui.classList.toggle('show', want); }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+
+      return { init, setActions, setEnabled, config: cfg, isTouchDevice };
+    })();
+
+    // 注入本游戏的动作（与键盘共用同一组闭包变量，单一来源）
+    TouchFramework.setActions({
+      left:  () => { if (currentTrackIndex > 0) { currentTrackIndex--; targetBallX = TRACK_CENTERS[currentTrackIndex]; } },
+      right: () => { if (currentTrackIndex < TRACK_CENTERS.length - 1) { currentTrackIndex++; targetBallX = TRACK_CENTERS[currentTrackIndex]; } },
+      jump:  () => { if (isGrounded && jumpCooldown <= 0) { verticalVelocity = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT); isGrounded = false; jumpCooldown = 0.3; } },
+      pause: () => { if (gameStarted && !gameOver) { gamePaused ? resumeGame() : pauseGame(); } },
+    });
+    TouchFramework.setEnabled(() => gameStarted && !gamePaused && !gameOver);
+    TouchFramework.init(renderer.domElement);
+    // 调试钩子（开销可忽略，供自动化验证与后续调试）
+    window.__TF = TouchFramework;
+    window.__dbgState = () => ({
+      lane: currentTrackIndex, grounded: isGrounded,
+      vy: +verticalVelocity.toFixed(3), x: +ball.position.x.toFixed(3),
+      touchDevice: TouchFramework.isTouchDevice,
+    });
+
+    // ══════════════════════════════════════════════════════════
+    //  🕳️  黑洞陷阱系统（旋涡+下陷+星光卷入）
+    // ══════════════════════════════════════════════════════════
+    const blackholes = [];
+    const BLACKHOLE_SPAWN_DISTANCE = 80;
+    const BLACKHOLE_DESPAWN_DISTANCE = 10;
+    let nextBlackholeId = 0;
+    let blackholeSpawnTimer = 0;
+    const BLACKHOLE_SPAWN_INTERVAL = 3.0;
+    let isBlackholed = false;
+
+    // ══════════════════════════════════════════════════════════
+    //  ☄️  陨石：2~3 块不规则岩石撞击粘合，缝隙透出微弱橙光
+    // ══════════════════════════════════════════════════════════
+
+    const METEOR_COLLIDE_RADIUS = 0.62;   // 陨石球形包围盒半径
+    const PLAYER_HIT_RADIUS     = 0.70;   // 玩家判定半径（略小于球体 0.8，留容错）
+    // 复用对象，避免每帧 new
+    const __swingQ = new THREE.Quaternion();
+
+    /**
+     * 生成一块不规则岩石。
+     * IcosahedronGeometry 是非索引几何，同一空间位置存在多个重复顶点；
+     * 用「坐标哈希」做确定性扰动，重复顶点会得到相同位移 → 岩石表面不会裂开。
+     */
+    function createRockGeometry(radius, detail) {
+      const geo = new THREE.IcosahedronGeometry(radius, detail === undefined ? 1 : detail);
+      const pos = geo.attributes.position;
+      const hash = (x, y, z) => {
+        const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+        return s - Math.floor(s);
+      };
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        // 沿半径方向整体缩放（同一坐标 → 同一系数，面保持连续）
+        v.multiplyScalar(0.70 + hash(v.x, v.y, v.z) * 0.58);
+        // 再加一点方向抖动，做出坑洼的不规则轮廓
+        v.x += (hash(v.y, v.z, v.x) - 0.5) * radius * 0.18;
+        v.y += (hash(v.z, v.x, v.y) - 0.5) * radius * 0.18;
+        v.z += (hash(v.x, v.y, v.z) - 0.5) * radius * 0.18;
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    /**
+     * 星星光晕贴图：径向渐变（中心纯白 → 边缘全透明）。
+     * PointsMaterial 不加 map 时点精灵是硬边方块/圆盘，size 一大就成了
+     * 糊在屏幕上的"虚影"；加了柔边贴图后大尺寸也是柔和光斑。
+     * 五层星星共用一份（缓存挂函数属性——函数声明会提升，const 不会，
+     * 星星层在模块初始化时就要调用，用 const 缓存会踩 TDZ）。
+     */
+    function makeStarGlowTexture() {
+      if (makeStarGlowTexture._t) return makeStarGlowTexture._t;
+      const S = 128;
+      const c = document.createElement('canvas');
+      c.width = c.height = S;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      g.addColorStop(0.00, 'rgba(255,255,255,1)');
+      g.addColorStop(0.18, 'rgba(255,255,255,0.92)');
+      g.addColorStop(0.42, 'rgba(255,255,255,0.38)');
+      g.addColorStop(0.72, 'rgba(255,255,255,0.08)');
+      g.addColorStop(1.00, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, S, S);
+      const tex = new THREE.CanvasTexture(c);
+      makeStarGlowTexture._t = tex;
+      return tex;
+    }
+
+    /**
+     * 光束贴图：沿长度方向的 alpha 渐变。
+     * 实测 ConeGeometry 的 UV.v：顶点(缝隙端)对应 canvas 顶部、底面(末端)对应 canvas 底部，
+     * 所以顶部不透明、底部渐隐 → 光从缝隙处最亮，向末端逐渐消散。
+     * 多个光束共用一个纹理（带缓存）。
+     */
+    const __shaftTexCache = {};
+    function makeShaftTexture() {
+      if (__shaftTexCache.t) return __shaftTexCache.t;
+      const S = 128;
+      const c = document.createElement('canvas');
+      c.width = c.height = S;
+      const ctx = c.getContext('2d');
+      // 顶部(缝隙端)最亮，向下(末端)渐隐；亮度保持到 40% 再衰减，避免光束只剩根部一点
+      const g = ctx.createLinearGradient(0, 0, 0, S);
+      g.addColorStop(0.00, 'rgba(255,255,255,1)');
+      g.addColorStop(0.40, 'rgba(255,255,255,0.85)');
+      g.addColorStop(0.72, 'rgba(255,255,255,0.45)');
+      g.addColorStop(1.00, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, S, S);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      __shaftTexCache.t = tex;
+      return tex;
+    }
+
+    // 创建陨石（替换原黑洞外观；生成/碰撞/计分等玩法逻辑不变）
+    // ══════════════════════════════════════════════════════
+    //  ☄️ 陨石对象池：几何/贴图全部预创建共享，spawn 只重置变换参数
+    //     旧实现每次 spawn 新建 3 块岩石几何 + 1 core + 3 crack + 4~12 束
+    //     ConeGeometry + 同数量材质，实测单次 15.2ms——每 3 秒一次的帧尖峰；
+    //     且每颗陨石挂 1 个 PointLight，场景动态光 7~8 个，shader 成本高。
+    //     现在：spawn ≈ 0.1ms（纯参数重置），coreLight 全局共享 1 个。
+    // ══════════════════════════════════════════════════════
+    const ROCK_LAYOUT = [
+      { r: 0.40, p: [ 0.24,  0.03,  0.05], s: [1.00, 0.92, 1.00] },
+      { r: 0.32, p: [-0.30, -0.12,  0.20], s: [0.94, 1.00, 0.90] },
+      { r: 0.26, p: [-0.06,  0.40, -0.24], s: [1.00, 0.88, 0.96] },
+    ];
+    const SHAFT_COLORS = [0xffa040, 0xc4b0ff];   // 橙 / 蓝紫（提亮过，暗背景下也够辨识）
+    const SHAFT_LENS   = [0.90, 1.20, 1.50];     // 光束长度档位（池化：固定档代替连续随机）
+    const SHAFT_RADII  = [0.135, 0.058];         // 外层宽淡 / 内层窄亮
+
+    // ── 共享几何（一次性创建，池化复用）──
+    const ROCK_GEOS  = ROCK_LAYOUT.map(lay => createRockGeometry(lay.r, 1));
+    const SHAFT_GEOS = SHAFT_LENS.map(len => SHAFT_RADII.map(r => new THREE.ConeGeometry(r, len, 8, 1, true)));
+    const CORE_GEO   = new THREE.SphereGeometry(0.12, 16, 12);
+    const CRACK_GEOS = [0.045, 0.060, 0.075].map(r => new THREE.SphereGeometry(r, 10, 8));
+    const shaftTex   = makeShaftTexture();
+
+    // ── 共享材质：岩石静态无动画 → 全局 1 个；core/crack/光束要独立呼吸 → 池内 per-mesh ──
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: 0x50505a,
+      roughness: 0.92,
+      metalness: 0.08,
+      emissive: 0x1a0e06,   // 极暗余温，避免背光面纯黑看不见
+      flatShading: true,
+    });
+
+    // 缝隙橙光的全局共享照明：每帧跟随最近的活跃陨石（替代每颗一个 PointLight）
+    const sharedCoreLight = new THREE.PointLight(0xff7a22, 0, 2.6, 2);
+    scene.add(sharedCoreLight);
+
+    const __upVec = new THREE.Vector3(0, 1, 0);
+    const __dirVec = new THREE.Vector3();
+    const __swingAxis = new THREE.Vector3(0, 0, 1);
+
+    // 构建一颗池化陨石：固定满配（3 岩 + 1 核 + 3 缝斑 + 3缝×2束×2层=12 光束），
+    // 靠 visible 控制实际数量（rockCount 2~3、每缝 1~2 束）
+    function buildMeteor() {
+      const group = new THREE.Group();
+
+      const rocks = ROCK_LAYOUT.map((lay) => {
+        const rock = new THREE.Mesh(ROCK_GEOS[ROCK_LAYOUT.indexOf(lay)], rockMat);
+        rock.position.set(lay.p[0], lay.p[1], lay.p[2]);
+        rock.scale.set(lay.s[0], lay.s[1], lay.s[2]);
+        group.add(rock);
+        return { mesh: rock, spinX: 0, spinZ: 0 };
+      });
+
+      const core = new THREE.Mesh(CORE_GEO, new THREE.MeshBasicMaterial({
+        color: 0xff7a22, transparent: true, opacity: 0.62,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      core.renderOrder = 3;
+      group.add(core);
+
+      const crackLights = ROCK_LAYOUT.map(() => {
+        const spot = new THREE.Mesh(CRACK_GEOS[0], new THREE.MeshBasicMaterial({
+          color: 0xff9433, transparent: true, opacity: 0.7,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        }));
+        spot.renderOrder = 4;
+        group.add(spot);
+        return spot;
+      });
+
+      const shafts = [];
+      for (let i = 0; i < 3; i++) {           // 3 缝
+        for (let j = 0; j < 2; j++) {         // 每缝最多 2 束
+          for (let layer = 0; layer < 2; layer++) {
+            const beam = new THREE.Mesh(SHAFT_GEOS[0][layer], new THREE.MeshBasicMaterial({
+              color: SHAFT_COLORS[0], map: shaftTex, transparent: true,
+              opacity: layer === 0 ? 0.48 : 1.00,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false, side: THREE.DoubleSide,
+            }));
+            beam.renderOrder = 2 + layer;
+            group.add(beam);
+            shafts.push({
+              mesh: beam,
+              baseQuat: new THREE.Quaternion(),
+              base: layer === 0 ? 0.48 : 1.00,
+              phase: 0,
+              speed: 1.4,
+            });
+          }
+        }
+      }
+
+      group.visible = false;
+      return {
+        id: 0, group, mesh: group, rocks, core, crackLights, shafts,
+        rockCount: 3, laneIndex: 0, startZ: 0, triggered: false, time: 0,
+        radius: METEOR_COLLIDE_RADIUS, baseX: 0, driftPhase: 0, spinSpeed: 0.1,
+      };
+    }
+
+    // 重置一颗（新获取或复用的）陨石到目标位置/车道
+    function resetPooledMeteor(bh, zPos, laneIndex) {
+      const rockCount = 2 + Math.floor(Math.random() * 2);
+      bh.rockCount = rockCount;
+
+      for (let i = 0; i < 3; i++) {
+        const r = bh.rocks[i];
+        r.mesh.visible = i < rockCount;
+        if (i < rockCount) {
+          r.mesh.rotation.set(
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2
+          );
+          r.spinX = (Math.random() - 0.5) * 0.30;
+          r.spinZ = (Math.random() - 0.5) * 0.22;
+        }
+      }
+
+      let si = 0;   // shaft 游标
+      for (let i = 0; i < rockCount; i++) {
+        const a = ROCK_LAYOUT[i];
+        const b = ROCK_LAYOUT[(i + 1) % rockCount];
+        const ox = (a.p[0] * a.r + b.p[0] * b.r) / (a.r + b.r);
+        const oy = (a.p[1] * a.r + b.p[1] * b.r) / (a.r + b.r);
+        const oz = (a.p[2] * a.r + b.p[2] * b.r) / (a.r + b.r);
+        const colorIdx = (Math.random() * SHAFT_COLORS.length) | 0;
+        const color = SHAFT_COLORS[colorIdx];
+
+        // 该缝小光斑：跟随光束颜色（材质独立，直接 setHex）
+        const spot = bh.crackLights[i];
+        spot.visible = true;
+        spot.position.set(ox, oy, oz);
+        spot.geometry = CRACK_GEOS[(Math.random() * CRACK_GEOS.length) | 0];
+        spot.material.color.setHex(color);
+
+        // 该缝 1~2 束光
+        const beamCount = 1 + (Math.random() < 0.45 ? 1 : 0);
+        for (let j = 0; j < 2; j++) {
+          const active = j < beamCount;
+          for (let layer = 0; layer < 2; layer++, si++) {
+            const s = bh.shafts[si];
+            s.mesh.visible = active;
+            if (!active) continue;
+            // 从缝隙向外射出，方向随机（略偏上，避免朝下插进地面）
+            __dirVec.set(
+              ox + (Math.random() - 0.5) * 1.3,
+              oy + 0.25 + Math.random() * 0.55,
+              oz + (Math.random() - 0.5) * 1.3
+            ).normalize();
+            const lenIdx = (Math.random() * SHAFT_LENS.length) | 0;
+            const len = SHAFT_LENS[lenIdx];
+            s.mesh.geometry = SHAFT_GEOS[lenIdx][layer];
+            s.mesh.material.color.setHex(color);
+            // ConeGeometry 顶点在 +y/2 → 让顶点贴住缝隙，即 +y 对准 -dir
+            s.mesh.position.set(ox, oy, oz).addScaledVector(__dirVec, len / 2);
+            s.mesh.quaternion.setFromUnitVectors(__upVec, __dirVec.clone().negate());
+            s.baseQuat.copy(s.mesh.quaternion);
+            s.base = layer === 0 ? 0.48 : 1.00;
+            s.phase = Math.random() * Math.PI * 2;
+            s.speed = 1.4 + Math.random() * 1.6;
+          }
+        }
+      }
+      // 隐藏多余配置
+      for (let i = rockCount; i < 3; i++) bh.crackLights[i].visible = false;
+      for (; si < bh.shafts.length; si++) bh.shafts[si].mesh.visible = false;
+
+      bh.group.position.set(TRACK_CENTERS[laneIndex], 0, zPos);
+      bh.group.visible = true;
+      scene.add(bh.group);
+
+      bh.laneIndex = laneIndex;
+      bh.startZ = zPos;
+      bh.triggered = false;
+      bh.time = 0;
+      bh.radius = METEOR_COLLIDE_RADIUS;
+      bh.baseX = TRACK_CENTERS[laneIndex];
+      bh.driftPhase = Math.random() * Math.PI * 2;
+      bh.spinSpeed = 0.10 + Math.random() * 0.08;
+    }
+
+    const meteorPool = [];
+    // 预热 3 颗（场景同时活跃上限约 3 颗），把唯一的 build 成本挪到加载期
+    for (let i = 0; i < 3; i++) meteorPool.push(buildMeteor());
+
+    // 生成黑洞（陨石）——从池获取或新建
+    function createBlackhole(zPos, laneIndex) {
+      let bh = meteorPool.pop();
+      if (!bh) bh = buildMeteor();
+      bh.id = nextBlackholeId++;
+      resetPooledMeteor(bh, zPos, laneIndex);
+      blackholes.push(bh);
+      return bh;
+    }
+
+    // 销毁黑洞（陨石）——释放回池，不 dispose 共享资源
+    function destroyBlackhole(blackhole) {
+      scene.remove(blackhole.group);
+      blackhole.group.visible = false;
+      meteorPool.push(blackhole);
+      const idx = blackholes.indexOf(blackhole);
+      if (idx > -1) blackholes.splice(idx, 1);
+    }
+
+    /**
+     * 避让函数：在 targetZ 附近 ±avoidRadius 范围内，给每条车道打分，
+     * 然后挑出最空的 laneIndex，用于 spawnStar / spawnItem / spawnBlackhole。
+     * 黑洞权重 > 道具 > 星星；如全占满则随机一条。
+     * XZ 硬门：落点与已有对象 XZ < 2.4 的车道直接出局——
+     * 相邻车道中心相距 2.0，只按 lane 打分时会出现"相邻车道 z 接近"的
+     * 两颗陨石视觉重叠（玩家观感：连在一起）。
+     */
+    function pickSafeLane(targetZ, avoidRadius = 5) {
+      const occupied = [0, 0, 0];
+      const blocked = [false, false, false];
+      const BLOCK_XZ = 2.4;
+      const tooClose = (z) => Math.abs(z - targetZ) < avoidRadius;
+      const markXZ = (x, z) => {
+        for (let l = 0; l < TRACK_CENTERS.length; l++) {
+          const dx = x - TRACK_CENTERS[l];
+          if (Math.sqrt(dx * dx + (z - targetZ) * (z - targetZ)) < BLOCK_XZ) blocked[l] = true;
+        }
+      };
+      collectibleStars.forEach(s => {
+        if (s.laneIndex >= 0 && s.laneIndex < 3 && tooClose(s.mesh.position.z)) {
+          occupied[s.laneIndex]++;
+          markXZ(s.mesh.position.x, s.mesh.position.z);
+        }
+      });
+      blackholes.forEach(b => {
+        if (b.laneIndex >= 0 && b.laneIndex < 3 && tooClose(b.mesh.position.z)) {
+          occupied[b.laneIndex] += 5; // 黑洞权重
+          markXZ(b.mesh.position.x, b.mesh.position.z);
+        }
+      });
+      collectibleItems.forEach(it => {
+        if (it.laneIndex >= 0 && it.laneIndex < 3 && tooClose(it.sprite.position.z)) {
+          occupied[it.laneIndex] += 2; // 道具权重
+          markXZ(it.sprite.position.x, it.sprite.position.z);
+        }
+      });
+      let best = -1;
+      for (let i = 0; i < TRACK_CENTERS.length; i++) {
+        if (!blocked[i] && (best < 0 || occupied[i] < occupied[best])) best = i;
+      }
+      if (best < 0) {
+        // 全被硬门堵住（极罕见）：退回原权重逻辑，保证不卡生成
+        best = Math.floor(Math.random() * TRACK_CENTERS.length);
+        for (let i = 0; i < TRACK_CENTERS.length; i++) {
+          if (occupied[i] < occupied[best]) best = i;
+        }
+      }
+      return best;
+    }
+
+    // 生成黑洞（避开已有星星/道具/黑洞）
+    function spawnBlackhole() {
+      if (!SHOW_BLACKHOLES) return;   // 关闭陨石生成
+      const spawnZ = ball.position.z - BLACKHOLE_SPAWN_DISTANCE;
+      const lane = pickSafeLane(spawnZ);
+      createBlackhole(spawnZ, lane);
+    }
+
+    // 更新黑洞
+    function updateBlackholes(dt) {
+      // 生成新黑洞（dt 驱动：低帧率下间隔按真实时间走，不按帧数）
+      blackholeSpawnTimer += dt || 0.016;
+      if (blackholeSpawnTimer >= BLACKHOLE_SPAWN_INTERVAL) {
+        blackholeSpawnTimer = 0;
+        spawnBlackhole();
+      }
+
+      // ── 陨石动画：缓慢自转 + 轻微整体摇摆 + 缓慢平移 ──
+      blackholes.forEach(bh => {
+        bh.time += 0.016;
+
+        // 缓慢自转（绕 Y 轴）
+        bh.mesh.rotation.y += bh.spinSpeed * 0.016;
+        // 整体轻微摇摆：微小角度周期性摆动（两轴不同相位，避免机械感）
+        bh.mesh.rotation.z = Math.sin(bh.time * 0.85 + bh.driftPhase) * 0.07;
+        bh.mesh.rotation.x = Math.sin(bh.time * 0.62 + bh.driftPhase * 1.7) * 0.05;
+        // 缓慢平移：横向微漂 + 上下轻浮
+        bh.mesh.position.x = bh.baseX + Math.sin(bh.time * 0.42 + bh.driftPhase) * 0.15;
+        bh.mesh.position.y = Math.sin(bh.time * 0.55 + bh.driftPhase) * 0.10;
+
+        // 每块岩石独立微转 → 强化「碎块拼接」而非一体成型（隐藏的块不转）
+        bh.rocks.forEach(r => {
+          if (r.mesh.visible) {
+            r.mesh.rotation.x += r.spinX * 0.016;
+            r.mesh.rotation.z += r.spinZ * 0.016;
+          }
+        });
+
+        // 缝隙橙光：呼吸脉动（coreLight 已改为全局共享灯，见下方统一驱动）
+        bh.core.material.opacity = 0.48 + 0.20 * Math.sin(bh.time * 2.1);
+        bh.core.scale.setScalar(1 + 0.05 * Math.sin(bh.time * 3.2));
+        bh.crackLights.forEach((s, i) => {
+          if (s.visible) s.material.opacity = 0.55 + 0.30 * Math.sin(bh.time * 2.6 + i * 1.9);
+        });
+
+        // 缝隙光束：极光式呼吸（明暗流动）+ 粗细脉动 + 绕根部轻微摆动
+        // 摆动是必要的：group 绕 Y 自转时，朝上/朝下的光束正好在转轴附近，
+        // 视觉上几乎不产生位移；给每束光自己的摆幅才有"随陨石一起扫动"的感觉。
+        bh.shafts.forEach(s => {
+          if (!s.mesh.visible) return;   // 池化满配 12 束，未启用的跳过
+          // 呼吸下限 0.80：极光式流动但不能让光束大部分时间不可见
+          s.mesh.material.opacity = s.base * (0.80 + 0.20 * Math.sin(bh.time * s.speed + s.phase));
+          s.mesh.scale.setScalar(1 + 0.13 * Math.sin(bh.time * s.speed * 0.8 + s.phase));
+          const swing = Math.sin(bh.time * s.speed * 0.7 + s.phase) * 0.15;  // ±0.15 rad
+          s.mesh.quaternion.copy(s.baseQuat)
+            .multiply(__swingQ.setFromAxisAngle(__swingAxis, swing));
+        });
+      });
+
+      // 碰撞检测 & 销毁
+      let nearBlackhole = false;
+      let dangerLevel = 0;
+      
+      for (let i = blackholes.length - 1; i >= 0; i--) {
+        const bh = blackholes[i];
+
+        if (!bh.triggered && !isBlackholed) {
+          const dx = ball.position.x - bh.mesh.position.x;
+          const dy = ball.position.y - bh.mesh.position.y;
+          const dz = ball.position.z - bh.mesh.position.z;
+          const distXZ = Math.sqrt(dx * dx + dz * dz);
+          const dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);   // ☄️ 球形包围盒判定
+
+          // 接近时的警告效果：缝隙橙光增强
+          if (distXZ < 4 && distXZ > 1.2) {
+            nearBlackhole = true;
+            dangerLevel = Math.max(dangerLevel, 1 - (distXZ - 1.2) / 2.8); // 0到1，越近越大
+            bh.core.material.opacity = 0.55 + dangerLevel * 0.45;
+            bh.core.scale.setScalar(1 + dangerLevel * 0.22);
+            bh.crackLights.forEach(s => { if (s.visible) s.material.opacity = 0.7 + dangerLevel * 0.3; });
+          }
+
+          // ☄️ 球形包围盒碰撞：陨石半径 + 玩家判定半径
+          if (dist3D < bh.radius + PLAYER_HIT_RADIUS) {
+            // 护盾激活：吸收这次黑洞碰撞，标记黑洞已触发、不扣血
+            if (hasActiveStatus('shield')) {
+              bh.triggered = true;
+              consumeShield();
+              // 视觉反馈：球体自发光闪一次蓝光
+              ballMaterial.emissive.setHex(0x2f6fb5);
+              setTimeout(() => { ballMaterial.emissive.setHex(0x000000); }, 250);
+              // 明确提示"撞上了但被护盾挡下"——否则玩家会以为陨石无判定、直接穿过
+              spawnStarToast('🛡️ 护盾抵挡', innerWidth / 2 - 70, innerHeight * 0.30);
+              continue;
+            }
+            bh.triggered = true;
+            triggerBlackholeEffect();
+          }
+        }
+
+        if (bh.mesh.position.z > ball.position.z + BLACKHOLE_DESPAWN_DISTANCE) {
+          destroyBlackhole(bh);
+        }
+      }
+
+      // 缝隙橙光的全局共享灯：跟随最近的活跃陨石发光（替代每颗一个 PointLight，
+      // 场景动态光从 7~8 个降到 5 个，MeshStandardMaterial 多光源成本大减）
+      if (nearBlackhole) {
+        let nearest = null, nd = Infinity;
+        for (const bh of blackholes) {
+          const dx = ball.position.x - bh.mesh.position.x;
+          const dz = ball.position.z - bh.mesh.position.z;
+          const d = dx * dx + dz * dz;
+          if (d < nd) { nd = d; nearest = bh; }
+        }
+        if (nearest) {
+          sharedCoreLight.position.copy(nearest.mesh.position);
+          sharedCoreLight.intensity = 2.0 + dangerLevel * 2.5;
+          sharedCoreLight.visible = true;
+        }
+      } else {
+        sharedCoreLight.visible = false;
+      }
+      
+      // 全局接近警告 - 屏幕边缘泛红
+      const dangerOverlay = document.getElementById('dangerOverlay');
+      if (nearBlackhole && !isBlackholed) {
+        dangerOverlay.style.opacity = dangerLevel * 0.8;
+      } else {
+        dangerOverlay.style.opacity = 0;
+      }
+    }
+
+    // 触发黑洞效果
+    function triggerBlackholeEffect() {
+      isBlackholed = true;
+
+      // 扣除生命值
+      currentHealth--;
+      updateHealthDisplay();
+      
+      // 生命值跳动动画
+      const healthDiv = document.getElementById('health');
+      healthDiv.classList.add('hit');
+      setTimeout(() => healthDiv.classList.remove('hit'), 300);
+      
+      // 检查是否游戏结束
+      if (currentHealth <= 0) {
+        showGameOver();
+        return;
+      }
+
+      if (currentTrackIndex === 0) {
+        currentTrackIndex = 1;
+      } else if (currentTrackIndex === 2) {
+        currentTrackIndex = 1;
+      } else {
+        currentTrackIndex = Math.random() < 0.5 ? 0 : 2;
+      }
+      targetBallX = TRACK_CENTERS[currentTrackIndex];
+
+      // 强烈的视觉效果
+      const originalBg = scene.background;
+      
+      // 屏幕震动效果
+      let shakeTime = 0;
+      const shakeIntensity = 0.8;
+      const originalCameraPos = camera.position.clone();
+      
+      function screenShake() {
+        if (shakeTime < 0.6) {
+          shakeTime += 0.016;
+          const intensity = shakeIntensity * (1 - shakeTime / 0.6);
+          camera.position.x = originalCameraPos.x + (Math.random() - 0.5) * intensity;
+          camera.position.y = originalCameraPos.y + (Math.random() - 0.5) * intensity;
+          requestAnimationFrame(screenShake);
+        } else {
+          camera.position.copy(originalCameraPos);
+        }
+      }
+      screenShake();
+      
+      // 颜色闪变 - 从黑洞紫变到闪白再到正常
+      const flashColors = [0x331100, 0x662200, 0xaa4400, 0xff7700, 0xffffff, 0xff7700, 0x662200, 0x331100];
+      let flashIndex = 0;
+      
+      function flashEffect() {
+        if (flashIndex < flashColors.length) {
+          scene.background = new THREE.Color(flashColors[flashIndex]);
+          flashIndex++;
+          setTimeout(flashEffect, flashIndex <= 5 ? 40 : 50);
+        } else {
+          scene.background = originalBg;
+          isBlackholed = false;
+        }
+      }
+      flashEffect();
+      
+      // 球体被拉向黑洞时的拉伸效果
+      ball.scale.set(0.7, 1.5, 0.7);
+      setTimeout(() => {
+        ball.scale.set(1, 1, 1);
+      }, 200);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  ⭐  星星收集系统
+    // ══════════════════════════════════════════════════════════
+    const collectibleStars = [];
+    const STAR_SPAWN_DISTANCE = 80; // 生成距离
+    const STAR_DESPAWN_DISTANCE = 10; // 销毁距离
+    let nextStarId = 0;
+    let starSpawnTimer = 0;
+    const STAR_SPAWN_INTERVAL = 1.6; // 生成间隔（秒）
+    const STAR_COLLECT_RADIUS = 1.5; // XZ 平面拾取半径（球 z 1.5 范围即算吃到，跳跃也能捡）
+    const MAGNET_RADIUS = 12.0;       // 🧲 磁铁吸附半径（XZ 平面距离，覆盖隔 1 个轨道 + 前方 8 单位）
+    const MAGNET_ATTRACT_SPEED = 30;  // 🧲 磁铁吸附速度基准（单位：场景单位/秒）
+    let collectedScore = 0;
+
+    // ══════════════════════════════════════════════════════════
+    //  🎁  道具掉落系统：从 BANK_ITEMS 随机抽取
+    // ══════════════════════════════════════════════════════════
+    const ITEM_POOL_IDS = BANK_ITEMS.map(d => d.id);
+    const collectibleItems = [];
+    const ITEM_SPAWN_DISTANCE = 80;      // 生成距离
+    const ITEM_DESPAWN_DISTANCE = 10;    // 销毁距离
+    const ITEM_SPAWN_INTERVAL = 6.5;     // 生成间隔（秒）—— 比星星慢
+    const ITEM_COLLECT_RADIUS = 1.4;     // 碰撞距离
+    const ITEM_HITBOX_RADIUS = 1.0;      // mesh 视觉半径
+    let nextItemId = 0;
+    let itemSpawnTimer = 0;
+
+    // 把 emoji 画到 Canvas 上，做成 Sprite 纹理（带缓存）
+    const itemTextureCache = {};
+    function makeItemTexture(emoji, ringColor) {
+      const key = emoji + '|' + ringColor;
+      if (itemTextureCache[key]) return itemTextureCache[key];
+      const size = 128;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      // 外圈彩色光环（让道具更醒目，区别于金色星星）
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size*0.46, 0, Math.PI*2);
+      ctx.fillStyle = ringColor;
+      ctx.globalAlpha = 0.28;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // 内圈描边
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size*0.40, 0, Math.PI*2);
+      ctx.strokeStyle = ringColor;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      // emoji 本体
+      ctx.font = '78px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, size/2, size/2 + 4);
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      itemTextureCache[key] = tex;
+      return tex;
+    }
+    const ITEM_RING_COLORS = {
+      shield: '#66ddff',
+      magnet: '#ff77cc',
+      double: '#ffdd44',
+      boost:  '#aaff77',
+    };
+
+    function createItem(zPos, laneIndex, def) {
+      const ringColor = ITEM_RING_COLORS[def.id] || '#ffffff';
+      const mat = new THREE.SpriteMaterial({
+        map: makeItemTexture(def.emoji, ringColor),
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(1.4, 1.4, 1.4);
+      sprite.position.set(TRACK_CENTERS[laneIndex], 1.2, zPos);
+      sprite.userData.bobBase = 1.2;
+      scene.add(sprite);
+
+      collectibleItems.push({
+        id: nextItemId++,
+        sprite,
+        def,
+        laneIndex,
+        collected: false,
+      });
+    }
+
+    function destroyItem(it) {
+      scene.remove(it.sprite);
+      if (it.sprite.material) it.sprite.material.dispose();
+      const idx = collectibleItems.indexOf(it);
+      if (idx > -1) collectibleItems.splice(idx, 1);
+    }
+
+    function clearAllItems() {
+      collectibleItems.forEach(it => destroyItem(it));
+      collectibleItems.length = 0;
+      itemSpawnTimer = 0;
+    }
+
+    function spawnItem() {
+      const spawnZ = ball.position.z - ITEM_SPAWN_DISTANCE;
+      const lane = pickSafeLane(spawnZ);
+      const defId = ITEM_POOL_IDS[Math.floor(Math.random() * ITEM_POOL_IDS.length)];
+      const def = BANK_ITEMS.find(d => d.id === defId);
+      if (!def) return;
+      createItem(spawnZ, lane, def);
+    }
+
+    function updateItems(dt) {
+      itemSpawnTimer += dt || 0.016;
+      if (itemSpawnTimer >= ITEM_SPAWN_INTERVAL) {
+        itemSpawnTimer = 0;
+        spawnItem();
+      }
+
+      for (let i = collectibleItems.length - 1; i >= 0; i--) {
+        const it = collectibleItems[i];
+
+        // 上下浮动 + 轻微旋转（用 sprite.material.rotation 模拟自转）
+        if (!it.collected) {
+          it.sprite.position.y = it.sprite.userData.bobBase + Math.sin(Date.now() * 0.004 + it.id) * 0.15;
+          it.sprite.material.rotation += 0.02;
+        }
+
+        // 碰撞检测（XZ 平面距离，避免跳跃时漏捡）
+        if (!it.collected) {
+          const dx = ball.position.x - it.sprite.position.x;
+          const dz = ball.position.z - it.sprite.position.z;
+          const distXZ = Math.sqrt(dx*dx + dz*dz);
+
+          if (distXZ < ITEM_COLLECT_RADIUS) {
+            // ── shield / magnet / double / boost：需要入槽 8s 倒计时 ──
+            // 防重复：槽中已有该道具 → 不入第二个槽，只重置倒计时
+            const existingSlot = findSlotWithItem(it.def.id);
+            if (existingSlot !== -1) {
+              it.collected = true;
+              refreshSlotDuration(existingSlot, it.def.id);
+              const scoreEl = document.getElementById('score');
+              if (scoreEl) {
+                const rect = scoreEl.getBoundingClientRect();
+                spawnStarToast(`${it.def.emoji} ${it.def.name} · 时间已重置`, rect.right + 8, rect.top + rect.height / 2);
+              }
+              playCollectAnim(it);
+              continue;
+            }
+            // 否则：入第一个空槽
+            const freeSlot = findEmptySlot();
+            if (freeSlot === -1) {
+              // 双槽已满且两槽都不同：直接穿过，无任何反馈；道具继续飞、自然回收
+              continue;
+            }
+
+            it.collected = true;
+            assignToSlot(freeSlot, it.def.id);
+            const scoreEl = document.getElementById('score');
+            if (scoreEl) {
+              const rect = scoreEl.getBoundingClientRect();
+              spawnStarToast(`${it.def.emoji} ${it.def.name}`, rect.right + 8, rect.top + rect.height / 2);
+            }
+            playCollectAnim(it);
+            continue;
+          }
+        }
+
+        // 销毁已过的道具
+        if (it.sprite.position.z > ball.position.z + ITEM_DESPAWN_DISTANCE) {
+          destroyItem(it);
+        }
+      }
+    }
+
+    // 星星几何体（五角星形状）
+    function createStarGeometry() {
+      const shape = new THREE.Shape();
+      const outerRadius = 0.4;
+      const innerRadius = 0.18;
+      const points = 5;
+
+      for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i * Math.PI) / points - Math.PI / 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (i === 0) {
+          shape.moveTo(x, y);
+        } else {
+          shape.lineTo(x, y);
+        }
+      }
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.15,
+        bevelEnabled: true,
+        bevelThickness: 0.05,
+        bevelSize: 0.05,
+        bevelSegments: 2
+      });
+      geometry.center();
+      return geometry;
+    }
+
+    const starGeo = createStarGeometry();
+    const starMat = new THREE.MeshStandardMaterial({
+      color: 0xffdd44,
+      emissive: new THREE.Color(0xffaa00),
+      emissiveIntensity: 1.0,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
+
+    // 创建星星
+    function createStar(zPos, laneIndex) {
+      // 材质全局共享（星星无差异化外观）——旧实现每颗 clone 一份，
+      // 高频 spawn 时产生大量短命材质对象
+      const mesh = new THREE.Mesh(starGeo, starMat);
+      mesh.position.set(TRACK_CENTERS[laneIndex], 0.8, zPos);
+      mesh.rotation.z = Math.random() * Math.PI;
+      scene.add(mesh);
+
+      const star = {
+        id: nextStarId++,
+        mesh: mesh,
+        laneIndex: laneIndex,
+        startZ: zPos,
+        collected: false,
+      };
+      collectibleStars.push(star);
+      return star;
+    }
+
+    // 销毁星星
+    function destroyStar(star) {
+      scene.remove(star.mesh);
+      // 材质为全局共享（starMat），不能 dispose；几何同样共享
+      const idx = collectibleStars.indexOf(star);
+      if (idx > -1) collectibleStars.splice(idx, 1);
+    }
+
+    // 生成星星
+    function spawnStar() {
+      const spawnZ = ball.position.z - STAR_SPAWN_DISTANCE;
+      const lane = pickSafeLane(spawnZ);
+      createStar(spawnZ, lane);
+    }
+
+    // 更新星星
+    function updateStars(dt) {
+      // 生成新星星（dt 驱动）
+      starSpawnTimer += dt || 0.016;
+      if (starSpawnTimer >= STAR_SPAWN_INTERVAL) {
+        starSpawnTimer = 0;
+        spawnStar();
+      }
+
+      // 旋转动画
+      collectibleStars.forEach(star => {
+        if (!star.collected) {
+          star.mesh.rotation.z += 0.03;
+          star.mesh.position.y = 0.8 + Math.sin(Date.now() * 0.005 + star.id) * 0.1;
+        }
+      });
+
+      // 碰撞检测 & 销毁已过的星星
+      for (let i = collectibleStars.length - 1; i >= 0; i--) {
+        const star = collectibleStars[i];
+
+        // 🧲 磁铁激活：在磁铁吸附半径内，星星向球体方向位移
+        if (!star.collected && hasActiveStatus('magnet')) {
+          const mdx = ball.position.x - star.mesh.position.x;
+          const mdy = ball.position.y - star.mesh.position.y;
+          const mdz = ball.position.z - star.mesh.position.z;
+          const mDist = Math.sqrt(mdx*mdx + mdz*mdz);
+          if (mDist < MAGNET_RADIUS) {
+            // 距离越近 → 速度越快（lerp 风格），但保底 ≥ 球速 × 1.6（确保星星能追上球，不被甩掉）
+            const t = Math.max(0, 1 - mDist / MAGNET_RADIUS); // 0→1，靠近=1
+            const baseSpeed = MAGNET_ATTRACT_SPEED * (0.5 + 0.5 * t); // 0.5x → 1.0x
+            const speed = Math.max(baseSpeed, TRACK_SPEED * 1.6);     // 关键：保底追上球
+            const inv = mDist > 0.001 ? 1 / mDist : 0;
+            star.mesh.position.x += mdx * speed * dt * inv;
+            star.mesh.position.z += mdz * speed * dt * inv;
+            star.mesh.position.y += mdy * speed * dt * inv * 0.6; // y 方向弱一点，避免上下抖
+            // 星星轻微放大+发光（视觉提示）
+            const pulse = 1 + t * 0.25;
+            star.mesh.scale.setScalar(pulse);
+          }
+        }
+
+        // 碰撞检测（XZ 平面距离 < STAR_COLLECT_RADIUS，忽略 y，避免跳跃时漏捡）
+        if (!star.collected) {
+          const dx = ball.position.x - star.mesh.position.x;
+          const dz = ball.position.z - star.mesh.position.z;
+          const distXZ = Math.sqrt(dx*dx + dz*dz);
+
+          if (distXZ < STAR_COLLECT_RADIUS) {
+            star.collected = true;
+            // ✖️2 双倍激活：得分 ×2
+            const gain = hasActiveStatus('double') ? 2 : 1;
+            collectedScore += gain;
+            document.getElementById('scoreValue').textContent = collectedScore;
+
+            // 检查并更新最高分数
+            if (collectedScore > highScore) {
+              highScore = collectedScore;
+              localStorage.setItem('stellarRunnerHighScore', highScore);
+            }
+
+            // 💰 入库到星空仓库（货币累积）
+            depositStars(gain);
+            // 浮动 +N 提示（基于 score 显示位置）
+            const scoreEl = document.getElementById('score');
+            if (scoreEl) {
+              const rect = scoreEl.getBoundingClientRect();
+              spawnStarToast(`+${gain} ⭐`, rect.right + 8, rect.top + rect.height / 2);
+            }
+
+            // 收集特效：快速缩小消失
+            const shrink = () => {
+              star.mesh.scale.multiplyScalar(0.85);
+              if (star.mesh.scale.x > 0.1) {
+                requestAnimationFrame(shrink);
+              } else {
+                destroyStar(star);
+              }
+            };
+            shrink();
+            continue;
+          }
+        }
+
+        // 销毁已过的星星
+        if (star.mesh.position.z > ball.position.z + STAR_DESPAWN_DISTANCE) {
+          destroyStar(star);
+        }
+      }
+    }
+
+    // 创建单段轨道
+    function createTrackSegment(startZ) {
+      const group = new THREE.Group();
+      const materials = []; // 保存材质引用用于后续更新
+
+      LANE_X.forEach((lx, li) => {
+        const count = Math.floor(PN * 0.7);
+        const pos = new Float32Array(count * 3);
+        let written = 0;
+
+        for (let i = 0; i < PN; i++) {
+          if (i % 10 >= 7) continue;
+          pos[written*3] = lx;
+          pos[written*3+1] = TRACK_Z + (Math.random() - 0.5) * 0.06;
+          pos[written*3+2] = startZ + (i / PN) * SEGMENT_LENGTH;
+          written++;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const mat = new THREE.PointsMaterial({
+          color: 0x88ddff,
+          size: LANE_SIZE[li],
+          transparent: true,
+          opacity: LANE_ALPHA[li],
+          sizeAttenuation: true,
+        });
+        group.add(new THREE.Points(geo, mat));
+        materials.push(mat);
+      });
+
+      scene.add(group);
+      return {
+        mesh: group,
+        materials: materials,
+        startZ: startZ,
+        endZ: startZ + SEGMENT_LENGTH,
+        id: nextSegmentId++
+      };
+    }
+
+    // 销毁轨道段（内存回收）
+    function destroySegment(segment) {
+      scene.remove(segment.mesh);
+      segment.mesh.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+      trackSegments.delete(segment.id);
+    }
+
+    // 更新轨道段
+    function updateTrack() {
+      const ballZ = ball.position.z;
+
+      // 1. 卸载后方已过的段
+      const toRemove = [];
+      trackSegments.forEach((segment, id) => {
+        if (segment.endZ > ballZ + UNLOAD_BEHIND) {
+          toRemove.push(segment);
+        }
+      });
+      toRemove.forEach(seg => {
+        destroySegment(seg);
+      });
+
+      // 2. 加载前方新段（-Z方向，更小的Z值）
+      // 找到最前方段的起始位置（Z值最小）
+      let minStartZ = ballZ;
+      trackSegments.forEach(segment => {
+        if (segment.startZ < minStartZ) {
+          minStartZ = segment.startZ;
+        }
+      });
+
+      // 继续向前生成新段，直到覆盖 LOAD_AHEAD 范围
+      const targetZ = ballZ - LOAD_AHEAD;
+      while (minStartZ > targetZ) {
+        const newStartZ = minStartZ - SEGMENT_LENGTH;
+        const segment = createTrackSegment(newStartZ);
+        trackSegments.set(segment.id, segment);
+        minStartZ = newStartZ;
+      }
+
+      // 3. 根据距离调整透明度（远处渐暗）
+      trackSegments.forEach((segment) => {
+        // 计算段中心到球的距离
+        const distFromBall = Math.abs(segment.startZ - ballZ);
+        // 近处 0-30 完全不透明，30-100 渐变到 0
+        const fadeStart = 30;
+        const fadeEnd = LOAD_AHEAD;
+        let opacity = 1.0;
+        if (distFromBall > fadeStart) {
+          opacity = Math.max(0.05, 1 - (distFromBall - fadeStart) / (fadeEnd - fadeStart));
+        }
+
+        // 应用透明度到所有材质
+        segment.materials.forEach((mat, li) => {
+          mat.opacity = LANE_ALPHA[li] * opacity;
+        });
+      });
+
+      // 更新统计显示
+      document.getElementById('stats').textContent = `轨道段: ${trackSegments.size}`;
+    }
+
+    // ── 球体（地球纹理）────────────────────────────────────────
+    const textureLoader = new THREE.TextureLoader();
+    
+    // 地球纹理 URL
+    const textureUrls = [
+      'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+      'https://unpkg.com/three@0.165.0/examples/textures/planets/earth_atmos_2048.jpg',
+    ];
+    
+    // 纯色备用材质（无污染）
+    const ballMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4488cc,
+      metalness: 0.1,
+      roughness: 0.5,
+    });
+    
+    // 尝试加载纹理
+    function tryLoadTexture(urlIndex) {
+      if (urlIndex >= textureUrls.length) return;
+      
+      textureLoader.load(
+        textureUrls[urlIndex],
+        (texture) => {
+          ballMaterial.map = texture;
+          ballMaterial.color.setHex(0xffffff);
+          ballMaterial.needsUpdate = true;
+        },
+        undefined,
+        () => tryLoadTexture(urlIndex + 1)
+      );
+    }
+    
+    tryLoadTexture(0);
+    
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.8, 64, 64),
+      ballMaterial
+    );
+    ball.position.set(0, 0, 0);
+    scene.add(ball);
+
+    const ballGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(1.0, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x66aadd, transparent: true, opacity: 0.12, side: THREE.BackSide,
+      })
+    );
+    ballGlow.position.copy(ball.position);
+    if (SHOW_BALL_GLOW) scene.add(ballGlow);
+
+    // ══════════════════════════════════════════════════════════
+    //  🛡️  🛡️ emoji sprite（shield 激活时显示在球上方，金色光环已移除）
+    // ══════════════════════════════════════════════════════════
+    // 🛡️ emoji Sprite（用 Canvas 画 128x128 圆形 + emoji）
+    function makeShieldSprite() {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      // 半透明深色圆底，让 emoji 突出
+      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+      grad.addColorStop(0, 'rgba(20,30,55,0.55)');
+      grad.addColorStop(1, 'rgba(20,30,55,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(64, 64, 60, 0, Math.PI * 2); ctx.fill();
+      // 边框金色
+      ctx.strokeStyle = 'rgba(255,220,120,0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2); ctx.stroke();
+      // emoji
+      ctx.font = '64px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🛡️', 64, 64);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(1.2, 1.2, 1);
+      sp.renderOrder = 6;
+      return sp;
+    }
+    const shieldSprite = makeShieldSprite();
+    shieldSprite.visible = false;
+    scene.add(shieldSprite);
+
+    // 球状态联动：跟随球移动，emoji 上下轻微浮动
+    function updateShieldVisuals(dt) {
+      const shieldActive = hasActiveStatus('shield');
+      shieldSprite.visible = shieldActive;
+      if (!shieldActive) return;
+      // 🛡️ emoji 上下轻微浮动（±0.08 单位，频率 ~2.5 Hz）
+      const bob = Math.sin(performance.now() * 0.005) * 0.08;
+      shieldSprite.position.set(
+        ball.position.x,
+        ball.position.y + 1.05 + bob,
+        ball.position.z
+      );
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  🌈  球体拖尾效果
+    // ══════════════════════════════════════════════════════════
+    const TRAIL_LENGTH = 60;  // 拖尾粒子数量
+    const trailPositions = new Float32Array(TRAIL_LENGTH * 3);
+    const trailColors = new Float32Array(TRAIL_LENGTH * 3);
+    const trailSizes = new Float32Array(TRAIL_LENGTH);
+    
+    // 初始化拖尾数据
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+      const t = i / TRAIL_LENGTH;
+      // 渐变颜色：从亮蓝色到透明
+      const r = 0.4 + (1 - t) * 0.2;
+      const g = 0.6 + (1 - t) * 0.3;
+      const b = 1.0;
+      trailColors[i * 3] = r;
+      trailColors[i * 3 + 1] = g;
+      trailColors[i * 3 + 2] = b;
+      // 渐变大小：从小到大
+      trailSizes[i] = 0.15 + (1 - t) * 0.5;
+    }
+    
+    const trailGeometry = new THREE.BufferGeometry();
+    trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+    trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+    trailGeometry.setAttribute('size', new THREE.BufferAttribute(trailSizes, 1));
+    
+    const trailMaterial = new THREE.PointsMaterial({
+      size: 0.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    
+    const trailParticles = new THREE.Points(trailGeometry, trailMaterial);
+    trailParticles.renderOrder = 5;
+    if (SHOW_TRAIL) scene.add(trailParticles);
+    
+    // 拖尾历史位置队列
+    const trailHistory = [];
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+      trailHistory.push(new THREE.Vector3(0, 0, 0));
+    }
+    let trailUpdateCounter = 0;
+
+    // 相机初始位置（球体后上方）
+    const CAMERA_OFFSET = new THREE.Vector3(0, 3.5, 8);
+    camera.position.copy(ball.position).add(CAMERA_OFFSET);
+    camera.lookAt(ball.position);
+
+    // ── 灯光 ───────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x1b2b52, 2.2));
+
+    const mainLight = new THREE.PointLight(0x88ccff, 120, 20);
+    mainLight.position.set(3, 4, 3);
+    scene.add(mainLight);
+
+    const fillLight = new THREE.PointLight(0xffaa44, 40, 15);
+    fillLight.position.set(-4, 1, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0xaa44ff, 30, 10);
+    rimLight.position.set(0, -3, 0);
+    scene.add(rimLight);
+
+    // ── 面光：跟随相机的定向补光 + 近场柔光池 ──
+    // 原有 3 个点光固定在原点附近，球跑远后距离衰减到几乎不受光
+    // （实测球心中间亮度仅 ~13/255，接近全黑）；
+    // 定向光无距离衰减、挂在相机上 = 球体任何位置都有稳定的"面光"照明；
+    // 聚光灯带 penumbra 柔边 + distance 限制，只给近处陨石加一层柔和光池，不点亮整个画面。
+    scene.add(camera);   // 相机入 scene，子级灯光才参与渲染
+
+    const fillDir = new THREE.DirectionalLight(0xcfe0ff, 1.35);
+    fillDir.position.set(0, 0, 0);            // 相机局部原点
+    camera.add(fillDir);
+    const fillTarget = new THREE.Object3D();
+    fillTarget.position.set(0, -0.15, -10);   // 相机局部前方 10 单位、略低（球在相机前下方）
+    camera.add(fillTarget);
+    fillDir.target = fillTarget;
+
+    const nearPool = new THREE.SpotLight(0xbdd2ff, 60, 13, 1.05, 0.85, 1.8);
+    nearPool.position.set(0, 1.2, -1.5);      // 相机局部前上方
+    camera.add(nearPool);
+    const nearTarget = new THREE.Object3D();
+    nearTarget.position.set(0, -1.5, -12);    // 照向相机前下方（球与近距陨石）
+    camera.add(nearTarget);
+    nearPool.target = nearTarget;
+
+    // ══════════════════════════════════════════════════════════
+    //  🎬  动画
+    // ══════════════════════════════════════════════════════════
+    const clock = new THREE.Clock();
+    let lastT = 0;
+    let meteorTimer = 0;
+    
+    // 相机在菜单时的位置
+    camera.position.set(0, 0, 12);
+    camera.lookAt(0, 0, 0);
+
+    // 创建失重漂浮物体
+    createFloatingOrbs();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      const dt = Math.min(t - lastT, 0.1); // 限制最大dt，防止跳帧
+      lastT = t;
+
+      // ── 开始菜单失重动画 ────────────────────────────────
+      if (!gameStarted) {
+        updateFloatingObjects(dt);
+        controls.update();
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // ── 暂停状态 ─────────────────────────────────────────
+      if (gamePaused) {
+        // 暂停时只更新相机和渲染
+        controls.update();
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // ── 游戏结束状态 ─────────────────────────────────────
+      if (gameOver) {
+        // 游戏结束时只渲染画面，停止所有游戏逻辑
+        controls.update();
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // ── 游戏开始后的逻辑 ───────────────────────────────
+      // ── 球体前进（向 -Z 方向）──────────────────────────────
+      // ⚡ boost 激活：移动速度 ×1.5
+      const effectiveSpeed = hasActiveStatus('boost') ? TRACK_SPEED * 1.5 : TRACK_SPEED;
+      ball.position.z -= effectiveSpeed * dt;
+
+      // ── 跳跃物理 ─────────────────────────────────────────
+      if (jumpCooldown > 0) jumpCooldown -= dt;
+
+      if (!isGrounded) {
+        // 应用重力
+        verticalVelocity -= GRAVITY * dt;
+        ball.position.y += verticalVelocity * dt;
+
+        // 落地检测（球体底部接触地面 Y=0）
+        if (ball.position.y <= 0) {
+          ball.position.y = 0;
+          verticalVelocity = 0;
+          isGrounded = true;
+        }
+      }
+
+      // ── 球体左右平滑移动（居中于间隙）──────────────────
+      const dx = targetBallX - ball.position.x;
+      ball.position.x += dx * LANE_SWITCH_SPEED * dt;
+
+      ballGlow.position.copy(ball.position);
+
+      // 🛡️ 护盾光环跟随球体
+      updateShieldVisuals(dt);
+
+      // ══════════════════════════════════════════════════════════
+      //  🌈  更新拖尾效果
+      // ══════════════════════════════════════════════════════════
+      trailUpdateCounter++;
+      if (trailUpdateCounter >= 2) { // 每2帧更新一次，节省性能
+        trailUpdateCounter = 0;
+        
+        // 将球体位置添加到历史队列开头
+        trailHistory.unshift(ball.position.clone());
+        if (trailHistory.length > TRAIL_LENGTH) {
+          trailHistory.pop();
+        }
+        
+        // 更新粒子位置
+        const positions = trailGeometry.attributes.position.array;
+        for (let i = 0; i < trailHistory.length; i++) {
+          positions[i * 3] = trailHistory[i].x;
+          positions[i * 3 + 1] = trailHistory[i].y;
+          positions[i * 3 + 2] = trailHistory[i].z;
+        }
+        trailGeometry.attributes.position.needsUpdate = true;
+        
+        // 动态调整粒子透明度（头部亮，尾部暗）
+        const dynamicColors = trailGeometry.attributes.color.array;
+        const dynamicSizes = trailGeometry.attributes.size.array;
+        for (let i = 0; i < trailHistory.length; i++) {
+          const t = i / trailHistory.length;
+          // 颜色渐变：头部亮蓝色，尾部淡紫色
+          dynamicColors[i * 3] = 0.4 + (1 - t) * 0.4;      // R
+          dynamicColors[i * 3 + 1] = 0.6 + (1 - t) * 0.3; // G
+          dynamicColors[i * 3 + 2] = 1.0;                   // B 保持最大
+          // 大小渐变：头部大，尾部小
+          dynamicSizes[i] = 0.1 + (1 - t) * 0.6;
+        }
+        trailGeometry.attributes.color.needsUpdate = true;
+        trailGeometry.attributes.size.needsUpdate = true;
+      }
+      trailMaterial.opacity = 0.6 + 0.2 * Math.sin(t * 3); // 脉动效果
+
+      // 球体向前滚动（绕 X 轴旋转）
+      const rollSpeed = TRACK_SPEED / 0.8; // 根据球体半径计算滚动速度
+      ball.rotation.x -= rollSpeed * dt;
+      // 左右移动时轻微左右倾斜
+      ball.rotation.z = -dx * 0.3;
+      ballGlow.rotation.copy(ball.rotation);
+
+      // ── 相机跟随 ─────────────────────────────────────────
+      // 保持相机与球体的相对位置
+      const targetCamPos = ball.position.clone().add(CAMERA_OFFSET);
+      camera.position.lerp(targetCamPos, 0.1);
+      camera.lookAt(ball.position.x, ball.position.y, ball.position.z - 10);
+
+      // 更新 OrbitControls 目标
+      controls.target.copy(ball.position);
+
+      // ── 动态加载/卸载轨道 ───────────────────────────────
+      updateTrack();
+
+      // ── 黑洞陷阱系统 ───────────────────────────────────
+      updateBlackholes(dt);
+
+      // ── 星星收集系统 ───────────────────────────────────
+      updateStars(dt);
+
+      // ── 道具掉落收集系统（皮肤除外） ──────────────────────────
+      updateItems(dt);
+
+      // ── 道具槽倒计时推进（5s 自然过期） ───────────────────
+      tickStatusSlots(dt);
+
+      // ── 星光跟随球体移动 ───────────────────────────────
+      starsGroup.position.copy(ball.position);
+      starsGroup.rotation.y += 0.00005;
+      stars2.rotation.y -= 0.0001;
+      stars3.rotation.y += 0.00018;
+
+      // ── 星光闪烁与脉动动画 ──────────────────────────────
+      const twinkleSpeed = 2.0;
+      const pulseSpeed = 1.5;
+      
+      // 中距亮星闪烁
+      const sizeAttr2 = geo2.attributes.size;
+      for (let i = 0; i < N2; i++) {
+        const baseSize = 0.35 + (i % 10) * 0.03;
+        const twinkle = 0.5 + 0.5 * Math.sin(t * twinkleSpeed + starTwinkleData.twinkle2[i]);
+        sizeAttr2.array[i] = baseSize * twinkle;
+      }
+      sizeAttr2.needsUpdate = true;
+      
+      // 超亮星脉动
+      const sizeAttr3 = geo3.attributes.size;
+      for (let i = 0; i < N3; i++) {
+        const baseSize = 1.2 + (i % 8) * 0.1;
+        const pulse = 0.7 + 0.3 * Math.sin(t * pulseSpeed + starTwinkleData.pulse3[i]);
+        sizeAttr3.array[i] = baseSize * pulse;
+      }
+      sizeAttr3.needsUpdate = true;
+      
+      // 光晕层透明度脉动
+      mat4.opacity = 0.3 + 0.15 * Math.sin(t * 0.8);
+      
+      // 闪烁星透明度变化
+      mat5.opacity = 0.5 + 0.4 * Math.sin(t * 3 + 1);
+
+      // ── 流星 ─────────────────────────────────────────────
+      meteorTimer += dt;
+      meteors.forEach(m => {
+        if (!m.active) {
+          if (meteorTimer > m.nextTrigger) {
+            resetMeteor(m);
+            m.nextTrigger = meteorTimer + 2 + Math.random() * 4;
+          }
+          return;
+        }
+        m.t += dt;
+        const prog = m.t / 0.9;
+        const head = m.start.clone().addScaledVector(m.dir, m.speed * m.t);
+        const tail = head.clone().addScaledVector(m.dir, -7);
+        const arr = m.geo.attributes.position.array;
+        arr[0]=tail.x; arr[1]=tail.y; arr[2]=tail.z;
+        arr[3]=head.x; arr[4]=head.y; arr[5]=head.z;
+        m.geo.attributes.position.needsUpdate = true;
+        m.mat.opacity = prog < 0.15 ? (prog/0.15)*0.95
+                      : prog < 0.7  ? 0.95
+                      :               (1-(prog-0.7)/0.3)*0.95;
+        if (prog >= 1) { m.active = false; m.mat.opacity = 0; }
+      });
+
+      // ── 动态灯光 ─────────────────────────────────────────
+      mainLight.position.x = ball.position.x + 3 * Math.cos(t * 0.4);
+      mainLight.position.z = ball.position.z + 3 * Math.sin(t * 0.4);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // 暴露给 Playwright 测试用
+    window.__scene = scene;
+    window.__ball = ball;
+    window.__collectibleStars = collectibleStars;
+    window.__collectibleItems = collectibleItems;
+    window.__blackholes = blackholes;
+    window.__addItem = addItem;
+    window.__BANK_ITEMS = BANK_ITEMS;
+    window.clearAllStatusSlots = clearAllStatusSlots;
+    window.assignToSlot = assignToSlot;
+    window.clearStatusSlot = clearStatusSlot;
+    window.findEmptySlot = findEmptySlot;
+    window.hasActiveStatus = hasActiveStatus;
+    window.tickStatusSlots = tickStatusSlots;
+    window.statusSlots = statusSlots;
+    // 把 currentHealth 替换为 get/set 代理，便于测试读最新值
+    let __hpRef = currentHealth;
+    Object.defineProperty(window, 'currentHealth', {
+      get() { return currentHealth; },
+      set(v) { currentHealth = v; },
+      configurable: true,
+    });
+    window.MAX_HEALTH = MAX_HEALTH;
+    window.TRACK_SPEED = TRACK_SPEED;
+    window.collectedScore = collectedScore;
+    window.consumeShield = consumeShield;
+
+    // 🛒 商店 / 装备 测试接口
+    window.__buyItem = buyItem;
+    window.__toggleEquip = toggleEquip;
+    window.__applyEquippedItems = applyEquippedItems;
+    window.__ITEM_PRICE = ITEM_PRICE;
+    window.__getItems = () => JSON.parse(JSON.stringify(items));
+    window.__setItems = (o) => { items = o; saveItems(); };
+    window.__getEquipped = () => equipped.slice();
+    window.__setStarBank = (n) => { totalStars = n; saveStarBank(); updateStarBankDisplay(); };
+    window.__getStarBank = () => totalStars;
+    Object.defineProperty(window, 'equipped', {
+      get() { return equipped; },
+      set(v) { equipped = v; },
+      configurable: true,
+    });
+
+    // ══════════════════════════════════════════════════════════
+    //  🎮  开始菜单事件
+    // ══════════════════════════════════════════════════════════
+    document.getElementById('btnStart').addEventListener('click', () => {
+      if (gameStarted) return;
+      gameStarted = true;
+
+      // 隐藏菜单
+      document.getElementById('startMenu').classList.add('hidden');
+
+      // 🎥 禁用轨道控制器：游戏内相机由跟随逻辑独占。
+      // OrbitControls 每帧 update() 会用内部球坐标重摆相机，用户在菜单/游戏中
+      // 误拖一次画布，相机就永久歪斜（实测旋转可达 0.19rad≈11°），
+      // 表现为画面错位、对象看着吃不到的"无法交互"感。
+      controls.enabled = false;
+
+      // 🌌 每次进入游戏，随机换一张星云背景
+      applyRandomNebulaBackground();
+
+      // 重置游戏状态
+      ball.position.set(0, 0, 0);
+      ball.rotation.set(0, 0, 0);
+      ballGlow.position.copy(ball.position);
+      // 相机立即摆到标准跟随位（不等 lerp），避免残留上一局的偏移
+      camera.position.copy(ball.position).add(CAMERA_OFFSET);
+      camera.lookAt(ball.position);
+
+      // 重置拖尾效果
+      trailHistory.forEach((pos, i) => {
+        pos.set(0, 0, 0);
+      });
+
+      // 清空失重漂浮物体
+      clearFloatingObjects();
+
+      // 💰 新一局开始：清零本局入库计数
+      sessionEarned = 0;
+
+      // 清掉激活的道具状态
+      clearAllStatusSlots();
+
+      // 🎒 应用赛前装备（填入双槽，开局自动生效，8s 倒计时）
+      applyEquippedItems();
+
+      // 重置所有 spawn timer，避免承接上一局残留导致开局重复 spawn
+      starSpawnTimer = 0;
+      blackholeSpawnTimer = 0;
+      itemSpawnTimer = 0;
+
+      // 立即生成前方轨道
+      updateTrack();
+      
+      // 预生成星星：3 颗，3 个车道各一颗（错开不重叠）
+      const lanes = [0, 1, 2];
+      for (let i = 0; i < 3; i++) {
+        const spawnZ = -25 - i * 18;
+        createStar(spawnZ, lanes[i]);
+      }
+      // 不再预生成黑洞，让 BLACKHOLE_SPAWN_INTERVAL 自然首 spawn（~3s 后）
+      // 黑洞出现后用 pickSafeLane() 自动避开星星/道具。
+      
+      // 重置相机
+      camera.position.copy(ball.position).add(CAMERA_OFFSET);
+      camera.lookAt(ball.position);
+      controls.target.copy(ball.position);
+      
+      // 重置生命值
+      currentHealth = MAX_HEALTH;
+      updateHealthDisplay();
+      
+      // 聚焦游戏
+      document.getElementById('info').style.opacity = '1';
+      document.getElementById('stats').style.opacity = '1';
+      document.getElementById('score').style.opacity = '1';
+      document.getElementById('health').style.opacity = '1';
+    });
+
+    document.getElementById('btnClose').addEventListener('click', () => {
+      // 关闭页面
+      window.close();
+    });
+
+    // ══════════════════════════════════════════════════════════
+    //  ⏸️  暂停菜单功能
+    // ══════════════════════════════════════════════════════════
+    function pauseGame() {
+      if (!gameStarted || gamePaused) return;
+      gamePaused = true;
+      document.getElementById('pauseMenu').classList.add('visible');
+    }
+
+    function resumeGame() {
+      if (!gamePaused) return;
+      gamePaused = false;
+      document.getElementById('pauseMenu').classList.remove('visible');
+      // 重置时间计算，防止跳帧
+      lastT = clock.getElapsedTime();
+    }
+
+    function returnToMainMenu() {
+      gameStarted = false;
+      gamePaused = false;
+      gameOver = false;
+      document.getElementById('pauseMenu').classList.remove('visible');
+      document.getElementById('gameOverMenu').classList.remove('visible');
+      document.getElementById('startMenu').classList.remove('hidden');
+      
+      // 重置球体位置
+      ball.position.set(0, 0, 0);
+      ballGlow.position.copy(ball.position);
+      
+      // 重置拖尾效果
+      trailHistory.forEach((pos) => {
+        pos.set(0, 0, 0);
+      });
+      
+      // 清除游戏对象
+      trackSegments.forEach((seg) => destroySegment(seg));
+      trackSegments.clear();
+      collectibleStars.forEach((star) => destroyStar(star));
+      collectibleStars.length = 0;
+      clearAllItems();
+      blackholes.forEach((bh) => destroyBlackhole(bh));
+      blackholes.length = 0;
+      // 重置所有 spawn timer，避免连续 spawn 造成重叠/重复
+      starSpawnTimer = 0;
+      blackholeSpawnTimer = 0;
+      itemSpawnTimer = 0;
+
+      // 重置分数
+      collectedScore = 0;
+      document.getElementById('scoreValue').textContent = '0';
+
+// 重置本局入库累加，刷新仓库显示（仓库总量保留）
+      sessionEarned = 0;
+      updateStarBankDisplay();
+
+      // 清掉激活的道具状态
+      clearAllStatusSlots();
+
+      // 重置生命值
+      currentHealth = MAX_HEALTH;
+      updateHealthDisplay();
+
+      // 更新最高分数显示
+      updateHighScoreDisplay();
+
+      // 隐藏游戏UI
+      document.getElementById('info').style.opacity = '0';
+      document.getElementById('stats').style.opacity = '0';
+      document.getElementById('score').style.opacity = '0';
+      document.getElementById('health').style.opacity = '0';
+      
+      // 重新创建失重漂浮物体
+      createFloatingOrbs();
+      
+      // 相机回到菜单位置
+      camera.position.set(0, 0, 12);
+      camera.lookAt(0, 0, 0);
+      controls.target.set(0, 0, 0);
+      // 回到菜单：恢复轨道控制器（开始界面允许拖拽欣赏），并清掉惯性
+      controls.enabled = true;
+      controls.reset();
+    }
+    
+    // 显示游戏结束画面
+    function showGameOver() {
+      gameOver = true;
+      document.getElementById('gameOverScoreValue').textContent = collectedScore;
+      document.getElementById('gameOverMenu').classList.add('visible');
+    }
+    
+    // 从游戏结束重新开始
+    function restartGame() {
+      // 检查并更新最高分数
+      if (collectedScore > highScore) {
+        highScore = collectedScore;
+        localStorage.setItem('stellarRunnerHighScore', highScore);
+      }
+      
+      gameOver = false;
+      document.getElementById('gameOverMenu').classList.remove('visible');
+      
+      // 重置球体位置
+      ball.position.set(0, 0, 0);
+      ball.rotation.set(0, 0, 0);
+      ball.scale.set(1, 1, 1);
+      ballGlow.position.copy(ball.position);
+      ballGlow.rotation.copy(ball.rotation);
+      
+      // 重置拖尾效果
+      trailHistory.forEach((pos) => {
+        pos.set(0, 0, 0);
+      });
+      
+      // 清除游戏对象
+      trackSegments.forEach((seg) => destroySegment(seg));
+      trackSegments.clear();
+      collectibleStars.forEach((star) => destroyStar(star));
+      collectibleStars.length = 0;
+      clearAllItems();
+      blackholes.forEach((bh) => destroyBlackhole(bh));
+      blackholes.length = 0;
+      // 重置所有 spawn timer，避免连续 spawn 造成重叠/重复
+      starSpawnTimer = 0;
+      blackholeSpawnTimer = 0;
+      itemSpawnTimer = 0;
+
+      // 重置分数
+      collectedScore = 0;
+      document.getElementById('scoreValue').textContent = '0';
+
+      // 重置本局入库累加
+      sessionEarned = 0;
+      updateStarBankDisplay();
+
+      // 清掉激活的道具状态
+      clearAllStatusSlots();
+
+      // 重置生命值
+      currentHealth = MAX_HEALTH;
+      updateHealthDisplay();
+      
+      // 重置轨道位置
+      currentTrackIndex = 1;
+      targetBallX = TRACK_CENTERS[currentTrackIndex];
+      
+      // 重置跳跃状态
+      isGrounded = true;
+      verticalVelocity = 0;
+      ball.position.y = 0;
+      
+      // 立即生成前方轨道
+      updateTrack();
+      
+      // 预生成星星：3 颗，3 个车道各一颗（错开不重叠）
+      const lanes = [0, 1, 2];
+      for (let i = 0; i < 3; i++) {
+        const spawnZ = -25 - i * 18;
+        createStar(spawnZ, lanes[i]);
+      }
+      // 不再预生成黑洞，让 BLACKHOLE_SPAWN_INTERVAL 自然首 spawn（~3s 后）
+      // 黑洞出现后用 pickSafeLane() 自动避开星星/道具。
+
+      // 重置相机
+      camera.position.copy(ball.position).add(CAMERA_OFFSET);
+      camera.lookAt(ball.position);
+      controls.target.copy(ball.position);
+      controls.enabled = false;   // 与 startGame 一致：游戏内相机归跟随逻辑独占
+
+      // 重置时间计算
+      lastT = clock.getElapsedTime();
+      
+      // 重置黑洞状态（关键！否则重新开始后第一次碰撞无效）
+      isBlackholed = false;
+      blackholes.forEach(bh => bh.triggered = false);
+    }
+
+    // ESC 键暂停
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!gameStarted) return;
+        if (gamePaused) {
+          resumeGame();
+        } else {
+          pauseGame();
+        }
+      }
+    });
+
+    // 继续游戏按钮
+    document.getElementById('btnResume').addEventListener('click', resumeGame);
+
+    // 回到开始页面按钮
+    document.getElementById('btnMainMenu').addEventListener('click', returnToMainMenu);
+    
+    // 游戏结束菜单按钮
+    document.getElementById('btnRestart').addEventListener('click', restartGame);
+    document.getElementById('btnGameOverMainMenu').addEventListener('click', returnToMainMenu);
+
+    // 初始隐藏游戏UI
+    document.getElementById('info').style.opacity = '0';
+    document.getElementById('stats').style.opacity = '0';
+    document.getElementById('score').style.opacity = '0';
+    document.getElementById('health').style.opacity = '0';
+    
+    // 更新最高分数显示
+    function updateHighScoreDisplay() {
+      document.getElementById('highScoreValue').textContent = highScore;
+      document.getElementById('pauseHighScoreValue').textContent = highScore;
+    }
+    updateHighScoreDisplay();
+
+    // 📦 仓库按钮事件
+    // 🛒 道具商店按钮（事件委托：兑换 / 装备）
+    document.getElementById('bankItemGrid').addEventListener('click', (e) => {
+      const buyBtn = e.target.closest('[data-buy]');
+      if (buyBtn) { buyItem(buyBtn.getAttribute('data-buy')); return; }
+      const equipBtn = e.target.closest('[data-equip-item]');
+      if (equipBtn) { toggleEquip(equipBtn.getAttribute('data-equip-item')); return; }
+    });
+
+    // 🎒 点击装备槽 → 卸下
+    document.getElementById('equipRow').addEventListener('click', (e) => {
+      const slot = e.target.closest('.equipSlot');
+      if (!slot) return;
+      const idx = parseInt(slot.getAttribute('data-equip'), 10);
+      const id = equipped[idx];
+      if (id) toggleEquip(id);
+    });
+
+    document.getElementById('btnBankInfo').addEventListener('click', () => {
+      alert(
+        '⭐ 星空仓库（货币 + 商店）\n\n' +
+        '• 货币：星星（游戏中收集即入库）\n' +
+        '• 兑换：每种道具 ' + ITEM_PRICE + '⭐ 换 1 个\n' +
+        '• 装备：赛前最多装备 ' + EQUIP_SLOT_COUNT + ' 个，开局自动生效（8 秒）\n' +
+        '• 装备中的道具可点「卸下」退回仓库\n' +
+        '• 数据自动保存到浏览器本地（localStorage）\n' +
+        '• 最高分（单局）独立保存，不会被仓库清零影响\n\n' +
+        '星格说明：每格代表 100 颗，满 10 格会高亮显示 ★。'
+      );
+    });
+
+    document.getElementById('btnBankReset').addEventListener('click', () => {
+      if (totalStars <= 0 && equipped.every(x => x === null)) {
+        alert('仓库已是空的，无需重置。');
+        return;
+      }
+      const ok = confirm(
+        `确定要清空星空仓库吗？\n\n当前累计：${totalStars} 颗星星\n道具与装备也会一并清空\n此操作不可撤销！`
+      );
+      if (!ok) return;
+      totalStars = 0;
+      sessionEarned = 0;
+      // 清空道具 + 装备
+      for (const def of BANK_ITEMS) items[def.id] = 0;
+      equipped = new Array(EQUIP_SLOT_COUNT).fill(null);
+      saveItems();
+      saveEquipped();
+      saveStarBank();
+      updateStarBankDisplay();
+    });
+
+    // 📦 仓库图标 → 打开仓库页
+    document.getElementById('starBankIcon').addEventListener('click', openStarBankPage);
+    // × 关闭按钮
+    document.getElementById('btnBankPageClose').addEventListener('click', closeStarBankPage);
+    // ESC 关闭
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('starBankPage').classList.contains('open')) {
+        closeStarBankPage();
+      }
+    });
+    // 点击 overlay 背景关闭（点在 .bankPageInner 外时）
+    document.getElementById('starBankPage').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeStarBankPage();
+    });
+
+    // 初始化仓库显示
+    updateStarBankDisplay();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
